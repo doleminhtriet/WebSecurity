@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+pydantic>=1.10,<3
+PyYAML
+python-dotenv
+pymongo[srv]
+joblib
+scikit-learn
+numpy
+scipy
+pandas
+beautifulsoup4
+lxml
+tldextract
+regex

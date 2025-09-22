@@ -1,0 +1,12 @@
+# 1) Make sure your CSVs exist
+#    data/phishing/train.csv  (columns: text,label)
+#    data/phishing/valid.csv  (columns: text,label)
+
+# 2) Train + save artifacts
+python -m modules.scan_phishing.cli train --config config/base.yaml
+
+# 3) Evaluate current artifacts
+python -m modules.scan_phishing.cli eval --config config/base.yaml
+
+# 4) Deploy the new model in the running API
+curl -X POST http://localhost:8000/phishing/reload

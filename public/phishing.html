@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Defense Capstone – Scan Phishing</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root { --bg:#0b1220; --card:#121a2a; --text:#e6edf3; --muted:#9fb1c7; --accent:#3b82f6; }
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu}
+    header{padding:20px;border-bottom:1px solid #1e2a44;display:flex;align-items:center;justify-content:space-between}
+    h1{margin:0;font-size:20px}
+    a{color:#7cc7ff;text-decoration:none}
+    .wrap{max-width:1100px;margin:0 auto;padding:20px}
+    .grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+    .card{background:var(--card);border:1px solid #203156;border-radius:16px;padding:16px;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+    label{display:block;margin:10px 0 6px;color:var(--muted)}
+    input[type="text"], textarea, input[type="file"]{width:100%;background:#0e1729;color:var(--text);border:1px solid #203156;border-radius:10px;padding:10px 12px}
+    textarea{min-height:120px}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .btn{background:#1f4fff;border:1px solid #2b59c3;color:#fff;padding:10px 14px;border-radius:10px;cursor:pointer}
+    .pill{display:inline-block;padding:3px 8px;border-radius:999px;font-size:12px}
+    .ok{background:rgba(16,185,129,.15);color:#10b981;border:1px solid rgba(16,185,129,.35)}
+    .bad{background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.35)}
+    pre{background:#0e1729;border:1px solid #203156;border-radius:10px;padding:12px;overflow:auto}
+  </style>
+</head>
+<body>
+  <header class="wrap">
+    <h1>Scan Phishing</h1>
+    <nav>
+      <a href="/">Home</a>
+      &nbsp;|&nbsp; <a href="/docs" target="_blank">API Docs</a>
+    </nav>
+  </header>
+
+  <main class="wrap">
+    <div class="grid">
+      <section class="card">
+        <h2>System Health</h2>
+        <div id="healthBox">Loading…</div>
+        <div class="row" style="margin-top:10px">
+          <button class="btn" id="reloadBtn">Reload Config / Artifacts</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Phishing Scan (Text)</h2>
+        <label>Subject</label>
+        <input id="subj" type="text" placeholder="e.g., Account Alert" />
+        <label>Body</label>
+        <textarea id="body" placeholder="Paste message text…"></textarea>
+        <div class="row" style="margin-top:10px">
+          <button class="btn" id="scanBtn">Scan Now</button>
+          <span id="scanResult"></span>
+        </div>
+        <div id="scanDebug" style="color:#9fb1c7;margin-top:6px"></div>
+      </section>
+
+      <section class="card">
+        <h2>Phishing Scan (.eml upload)</h2>
+        <input id="emlFile" type="file" accept=".eml" />
+        <div class="row" style="margin-top:10px">
+          <button class="btn" id="uploadBtn">Upload & Scan</button>
+          <span id="uploadResult"></span>
+        </div>
+        <div id="uploadDebug" style="color:#9fb1c7;margin-top:6px"></div>
+      </section>
+    </div>
+
+    <section class="card" style="margin-top:16px">
+      <h2>Last Response</h2>
+      <pre id="lastResponse">{}</pre>
+    </section>
+  </main>
+
+  <script>
+    const $ = id => document.getElementById(id);
+    const healthBox = $("healthBox"), reloadBtn = $("reloadBtn");
+    const subj = $("subj"), body = $("body"), scanBtn = $("scanBtn"), scanResult = $("scanResult"), scanDebug = $("scanDebug");
+    const emlFile = $("emlFile"), uploadBtn = $("uploadBtn"), uploadResult = $("uploadResult"), uploadDebug = $("uploadDebug");
+    const lastResponse = $("lastResponse");
+
+    function showResult(el, label, prob){
+      const p = (prob*100).toFixed(2)+"%";
+      el.innerHTML = `<span class="pill ${label? 'bad':'ok'}">${label? 'PHISHING':'LEGIT'} • ${p}</span>`;
+    }
+    function setLast(obj){ lastResponse.textContent = JSON.stringify(obj, null, 2); }
+
+    async function refreshHealth(){
+      try{
+        const r = await fetch("/phishing/health");
+        const j = await r.json();
+        const mongo = j.mongodb_connected ? '<span class="pill ok">Mongo connected</span>' : '<span class="pill bad">Mongo off</span>';
+        const model = j.model_loaded ? '<span class="pill ok">Model loaded</span>' : '<span class="pill bad">Model missing</span>';
+        healthBox.innerHTML = `${model} ${mongo} &nbsp; <span style="color:#9fb1c7">collection:</span> ${j.collection || '—'} &nbsp; <span style="color:#9fb1c7">threshold:</span> ${j.threshold}`;
+      }catch(e){ healthBox.textContent = "Health error: "+e; }
+    }
+
+    scanBtn.onclick = async ()=>{
+      scanResult.textContent = "Scanning…"; scanDebug.textContent="";
+      try{
+        const payload = { subject: subj.value || null, body: body.value || null };
+        const r = await fetch("/phishing/predict", { method:"POST", headers: { "Content-Type":"application/json" }, body: JSON.stringify(payload) });
+        const j = await r.json();
+        showResult(scanResult, j.label, j.probability);
+        scanDebug.textContent = "Logged server-side if Mongo is enabled.";
+        setLast(j);
+      }catch(e){ scanResult.textContent = "Error"; scanDebug.textContent = e; }
+    };
+
+    uploadBtn.onclick = async ()=>{
+      uploadResult.textContent = "Uploading…"; uploadDebug.textContent="";
+      const f = emlFile.files[0];
+      if(!f){ uploadResult.textContent = "Choose a .eml file first."; return; }
+      const form = new FormData(); form.append("file", f);
+      try{
+        const r = await fetch("/phishing/upload", { method:"POST", body: form });
+        const j = await r.json();
+        showResult(uploadResult, j.label, j.probability);
+        uploadDebug.textContent = "Logged server-side if Mongo is enabled.";
+        setLast(j);
+      }catch(e){ uploadResult.textContent = "Error"; uploadDebug.textContent = e; }
+    };
+
+    reloadBtn.onclick = async ()=>{
+      reloadBtn.disabled = true; reloadBtn.textContent = "Reloading…";
+      try{
+        const r = await fetch("/phishing/reload", { method:"POST" });
+        const j = await r.json(); setLast(j);
+      }catch(e){ setLast({error:String(e)}); }
+      finally{ reloadBtn.disabled = false; reloadBtn.textContent = "Reload Config / Artifacts"; refreshHealth(); }
+    };
+
+    refreshHealth();
+  </script>
+</body>
+</html>

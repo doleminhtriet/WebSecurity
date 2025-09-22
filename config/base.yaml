@@ -1,0 +1,35 @@
+app:
+  name: defense-capstone
+  env: dev
+
+mongodb:
+  enabled: true
+  uri: ""
+  database: defensedb
+  tls: true
+
+phishing:
+  data:
+    train_csv: data/phishing/train.csv
+    valid_csv: data/phishing/valid.csv
+    text_column: text
+    label_column: label
+  artifacts_dir: modules/scan_phishing/artifacts
+  features:
+    vocab_size: 30000
+    ngram_range: [1, 2]
+    min_df: 2
+    max_df: 0.9
+    lowercase: true
+    strip_html: true
+    include_url_features: true
+  model:
+    type: logistic_regression
+    C: 2.0
+    class_weight: balanced
+    max_iter: 200
+  threshold: 0.9
+  logging:
+    collection_predictions: predictions
+    log_only_positives: false
+    store_text: true

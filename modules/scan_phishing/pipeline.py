@@ -22,9 +22,17 @@ def save_artifacts(vec, clf, artifacts_dir: str):
 
 def load_artifacts(artifacts_dir: str):
     d = Path(artifacts_dir)
+    featurizer = load(d / "vectorizer.joblib")
+    clf = load(d / "model.joblib")
+    expected = getattr(clf, "n_features_in_", None)
+    if expected is not None:
+        try:
+            featurizer.expected_total_features = expected
+        except Exception:
+            pass
     return {
-        "featurizer": load(d / "vectorizer.joblib"),
-        "clf": load(d / "model.joblib"),
+        "featurizer": featurizer,
+        "clf": clf,
     }
 
 def train(cfg):

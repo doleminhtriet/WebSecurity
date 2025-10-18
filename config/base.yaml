@@ -33,3 +33,33 @@ phishing:
     collection_predictions: predictions
     log_only_positives: false
     store_text: true
+
+malware:
+  threshold: 0.6
+  scanner:
+    max_bytes: 20971520  # 20 MB
+    high_entropy_threshold: 7.2
+    suspicious_extensions: [".exe", ".dll", ".scr", ".bat", ".cmd", ".ps1", ".vbs", ".js", ".jar", ".wsf", ".msi", ".lnk", ".apk"]
+    suspicious_archive_extensions: [".zip", ".rar", ".7z", ".iso"]
+    suspicious_strings:
+      - powershell
+      - cmd.exe
+      - rundll32
+      - wscript.shell
+      - javascript:
+      - invoke-expression
+      - virtualalloc
+      - base64 -d
+      - downloadstring
+      - /bin/sh
+      - wget
+      - curl
+      - http://
+      - https://
+      - vbaProject.bin
+      - autoopen
+      - document_close
+  logging:
+    collection_scans: malware
+    log_only_positives: false
+    store_file_name: true

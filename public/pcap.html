@@ -1,27 +1,337 @@
-<!doctype html>
-<html lang="en">
+
+<!DOCTYPE html>
+<html>
 <head>
-  <meta charset="utf-8" />
-  <title>Defense Capstone – PCAP Analyze</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <style>
-    body{margin:0;background:#0b1220;color:#e6edf3;font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu}
-    .wrap{max-width:900px;margin:0 auto;padding:24px}
-    header{padding:20px;border-bottom:1px solid #1e2a44;display:flex;align-items:center;justify-content:space-between}
-    a{color:#7cc7ff;text-decoration:none}
-    .card{background:#121a2a;border:1px solid #203156;border-radius:16px;padding:18px;box-shadow:0 4px 14px rgba(0,0,0,.25)}
-    .muted{color:#9fb1c7}
-  </style>
+    <title>Simple PCAP Analyzer</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .upload-area {
+            border: 2px dashed #667eea;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 30px;
+            background: #f8f9fa;
+        }
+        input[type="file"] {
+            display: none;
+        }
+        .upload-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .upload-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        .analyze-btn {
+            background: #28a745;
+            color: white;
+            padding: 10px 25px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 15px;
+            display: none;
+        }
+        .results {
+            display: none;
+            margin-top: 30px;
+        }
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+        .stat-label {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+        .stat-value {
+            color: #333;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .section {
+            margin-bottom: 30px;
+        }
+        .section h3 {
+            color: #333;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background: #f8f9fa;
+            font-weight: bold;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
 </head>
 <body>
-  <header class="wrap">
-    <h1>PCAP Analyze</h1>
-    <nav><a href="/">Home</a> &nbsp;|&nbsp; <a href="/docs" target="_blank">API Docs</a></nav>
-  </header>
-  <main class="wrap">
-    <section class="card">
-      <p class="muted">Placeholder page. Add PCAP upload and analysis UI here.</p>
-    </section>
-  </main>
+    <div class="container">
+        <h1>🔍 Simple PCAP Analyzer</h1>
+        
+        <div class="upload-area">
+            <label for="file-input" class="upload-btn">Choose PCAP File</label>
+            <input type="file" id="file-input" accept=".pcap,.pcapng">
+            <p id="file-name" style="margin-top: 15px; color: #666;">No file selected</p>
+            <button class="analyze-btn" id="analyze-btn" onclick="analyzeFile()">Analyze PCAP</button>
+        </div>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Analyzing your PCAP file...</p>
+        </div>
+        
+        <div class="results" id="results">
+            <div class="stat-grid" id="stats"></div>
+            <div class="section" id="protocols"></div>
+            <div class="section" id="top-talkers"></div>
+            <div class="section" id="packet-details"></div>
+        </div>
+    </div>
+    
+    <script>
+        const fileInput = document.getElementById('file-input');
+        const fileName = document.getElementById('file-name');
+        const analyzeBtn = document.getElementById('analyze-btn');
+        let selectedFile = null;
+        
+        fileInput.addEventListener('change', function(e) {
+            selectedFile = e.target.files[0];
+            if (selectedFile) {
+                fileName.textContent = 'Selected: ' + selectedFile.name;
+                analyzeBtn.style.display = 'inline-block';
+            }
+        });
+        
+        async function analyzeFile() {
+            if (!selectedFile) return;
+            
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('results').style.display = 'none';
+            
+            try {
+                const response = await fetch('/pcap/analyze', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                if (data?.detail) {
+                    throw new Error(data.detail);
+                }
+                if (!data?.basic_stats) {
+                    throw new Error("Analyzer returned no statistics.");
+                }
+                displayResults(data);
+            } catch (error) {
+                alert('Error analyzing file: ' + error.message);
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+        
+        function displayResults(data) {
+            // Display basic stats
+            const statsHtml = `
+                <div class="stat-card">
+                    <div class="stat-label">Total Packets</div>
+                    <div class="stat-value">${data.basic_stats.total_packets}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Capture Duration</div>
+                    <div class="stat-value">${data.basic_stats.duration}s</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Unique IPs</div>
+                    <div class="stat-value">${data.basic_stats.unique_ips}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Total Size</div>
+                    <div class="stat-value">${data.basic_stats.total_bytes} bytes</div>
+                </div>
+            `;
+            document.getElementById('stats').innerHTML = statsHtml;
+            
+            // Display protocol distribution
+            let protocolHtml = '<h3>Protocol Distribution</h3><table><tr><th>Protocol</th><th>Count</th><th>Percentage</th></tr>';
+            for (const [protocol, count] of Object.entries(data.protocol_stats)) {
+                const percentage = ((count / data.basic_stats.total_packets) * 100).toFixed(1);
+                protocolHtml += `<tr><td>${protocol}</td><td>${count}</td><td>${percentage}%</td></tr>`;
+            }
+            protocolHtml += '</table>';
+            document.getElementById('protocols').innerHTML = protocolHtml;
+            
+            // Display top talkers
+            let talkersHtml = '<h3>Top Talkers (Source IPs)</h3><table><tr><th>IP Address</th><th>Packet Count</th></tr>';
+            for (const [ip, count] of data.top_talkers) {
+                talkersHtml += `<tr><td>${ip}</td><td>${count}</td></tr>`;
+            }
+            talkersHtml += '</table>';
+            document.getElementById('top-talkers').innerHTML = talkersHtml;
+
+            // Insert charts section
+            let chartsSection = `
+                <section id="charts" style="margin-top: 20px;">
+                    <h2>Charts</h2>
+                    <h3>Protocol Distribution</h3>
+                    <canvas id="protocolPie" height="120"></canvas>
+                    <h3 style="margin-top: 28px;">Top Talkers (Source IPs)</h3>
+                    <canvas id="topTalkersBar" height="140"></canvas>
+                    <h3 style="margin-top: 28px;">Traffic Over Time (per second)</h3>
+                    <canvas id="timeSeries" height="160"></canvas>
+                </section>
+            `;
+            // Insert charts after top talkers
+            document.getElementById('top-talkers').insertAdjacentHTML('afterend', chartsSection);
+
+            // Draw Protocol Pie Chart
+            const protocolLabels = Object.keys(data.protocol_stats);
+            const protocolCounts = Object.values(data.protocol_stats);
+            new Chart(document.getElementById('protocolPie'), {
+                type: 'pie',
+                data: {
+                    labels: protocolLabels,
+                    datasets: [{
+                        data: protocolCounts,
+                        backgroundColor: [
+                            '#667eea', '#764ba2', '#28a745', '#ffce56', '#ff6384', '#36a2eb', '#fd7e14'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { position: 'bottom' } }
+                }
+            });
+
+            // Draw Top Talkers Bar Chart
+            const talkerLabels = data.top_talkers.map(([ip]) => ip);
+            const talkerCounts = data.top_talkers.map(([, count]) => count);
+            new Chart(document.getElementById('topTalkersBar'), {
+                type: 'bar',
+                data: {
+                    labels: talkerLabels,
+                    datasets: [{
+                        label: 'Packet Count',
+                        data: talkerCounts,
+                        backgroundColor: '#667eea'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: { x: { title: { display: false } }, y: { beginAtZero: true } }
+                }
+            });
+
+            // Draw Traffic Over Time Chart (if available)
+            if (data.traffic_over_time) {
+                const timeLabels = data.traffic_over_time.map(item => item.time);
+                const timeCounts = data.traffic_over_time.map(item => item.count);
+                new Chart(document.getElementById('timeSeries'), {
+                    type: 'line',
+                    data: {
+                        labels: timeLabels,
+                        datasets: [{
+                            label: 'Packets per Second',
+                            data: timeCounts,
+                            fill: true,
+                            borderColor: '#764ba2',
+                            backgroundColor: 'rgba(118,75,162,0.1)',
+                            tension: 0.3
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: { legend: { display: false } },
+                        scales: { x: { title: { display: false } }, y: { beginAtZero: true } }
+                    }
+                });
+            }
+
+            // Display first 10 packets
+            let packetsHtml = '<h3>First 10 Packets</h3><table><tr><th>#</th><th>Time</th><th>Source</th><th>Destination</th><th>Protocol</th><th>Size</th></tr>';
+            data.packet_details.forEach((packet, index) => {
+                packetsHtml += `<tr>
+                    <td>${index + 1}</td>
+                    <td>${packet.time}</td>
+                    <td>${packet.source}</td>
+                    <td>${packet.destination}</td>
+                    <td>${packet.protocol}</td>
+                    <td>${packet.size}</td>
+                </tr>`;
+            });
+            packetsHtml += '</table>';
+            document.getElementById('packet-details').innerHTML = packetsHtml;
+            
+            document.getElementById('results').style.display = 'block';
+        }
+    </script>
 </body>
 </html>

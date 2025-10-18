@@ -1,0 +1,17 @@
+# 1) (optional) convert .eml → subject,body,label
+python scripts/eml_to_csv.py samples/ data/phishing/subject_body.csv --labels-csv labels.csv
+
+# 2) combine subject+body → text,label
+python scripts/combine_subject_body.py data/phishing/subject_body.csv data/phishing/all.csv
+
+# 3) split into train/valid (stratified)
+python scripts/stratified_split.py data/phishing/all.csv data/phishing/train.csv data/phishing/valid.csv
+
+# 4) train + save artifacts
+python -m modules.scan_phishing.cli train --config config/base.yaml
+
+# 5) evaluate current artifacts
+python -m modules.scan_phishing.cli eval --config config/base.yaml
+
+# 6) hot-reload API to use the new model
+curl -X POST http://localhost:8000/phishing/reload

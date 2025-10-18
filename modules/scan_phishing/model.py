@@ -35,4 +35,10 @@ def save_artifacts(pipe, artifacts_dir: str):
 def load_artifacts(artifacts_dir: str):
     featurizer = load(f"{artifacts_dir}/vectorizer.joblib")
     clf = load(f"{artifacts_dir}/model.joblib")
+    expected = getattr(clf, "n_features_in_", None)
+    if expected is not None and hasattr(featurizer, "__setattr__"):
+        try:
+            featurizer.expected_total_features = expected
+        except Exception:
+            pass
     return {"featurizer": featurizer, "clf": clf}

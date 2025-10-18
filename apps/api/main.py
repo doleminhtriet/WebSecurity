@@ -7,9 +7,13 @@ from fastapi.responses import RedirectResponse
 from pathlib import Path
 
 from modules.scan_phishing.service import router as phishing_router
+from modules.scan_malware.service import router as malware_router
+from modules.pcap.service import router as pcap_router
 
 app = FastAPI(title="Defense Capstone API", version="0.1.0")
 app.include_router(phishing_router)
+app.include_router(malware_router)
+app.include_router(pcap_router)
 
 # Absolute path to project-root/public
 STATIC_DIR = Path(__file__).resolve().parents[2] / "public"

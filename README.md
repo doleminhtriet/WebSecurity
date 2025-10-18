@@ -1,4 +1,4 @@
-# Defense Capstone – Engineering Notes
+# Web Security Capstone – Engineering Notes
 
 ## Overview
 - FastAPI service (`apps/api/main.py`) backed by a small set of security modules.

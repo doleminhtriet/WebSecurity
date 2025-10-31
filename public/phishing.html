@@ -22,6 +22,7 @@
     .ok{background:rgba(16,185,129,.15);color:#10b981;border:1px solid rgba(16,185,129,.35)}
     .bad{background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.35)}
     pre{background:#0e1729;border:1px solid #203156;border-radius:10px;padding:12px;overflow:auto}
+    .alert{display:none;margin-top:10px;padding:10px 14px;border-radius:12px;background:#facc15;color:#1f2937;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,.2)}
   </style>
 </head>
 <body>
@@ -54,6 +55,7 @@
           <span id="scanResult"></span>
         </div>
         <div id="scanDebug" style="color:#9fb1c7;margin-top:6px"></div>
+        <div id="scanWarning" class="alert" role="alert"></div>
       </section>
 
       <section class="card">
@@ -64,6 +66,7 @@
           <span id="uploadResult"></span>
         </div>
         <div id="uploadDebug" style="color:#9fb1c7;margin-top:6px"></div>
+        <div id="uploadWarning" class="alert" role="alert"></div>
       </section>
     </div>
 
@@ -76,13 +79,22 @@
   <script>
     const $ = id => document.getElementById(id);
     const healthBox = $("healthBox"), reloadBtn = $("reloadBtn");
-    const subj = $("subj"), body = $("body"), scanBtn = $("scanBtn"), scanResult = $("scanResult"), scanDebug = $("scanDebug");
-    const emlFile = $("emlFile"), uploadBtn = $("uploadBtn"), uploadResult = $("uploadResult"), uploadDebug = $("uploadDebug");
+    const subj = $("subj"), body = $("body"), scanBtn = $("scanBtn"), scanResult = $("scanResult"), scanDebug = $("scanDebug"), scanWarning = $("scanWarning");
+    const emlFile = $("emlFile"), uploadBtn = $("uploadBtn"), uploadResult = $("uploadResult"), uploadDebug = $("uploadDebug"), uploadWarning = $("uploadWarning");
     const lastResponse = $("lastResponse");
 
     function showResult(el, label, prob){
       const p = (prob*100).toFixed(2)+"%";
       el.innerHTML = `<span class="pill ${label? 'bad':'ok'}">${label? 'PHISHING':'LEGIT'} • ${p}</span>`;
+    }
+    function toggleWarning(box, label){
+      if(label){
+        box.textContent = "Warning: This message appears to be phishing. Do not click links or download attachments until verified.";
+        box.style.display = "block";
+      }else{
+        box.textContent = "";
+        box.style.display = "none";
+      }
     }
     function setLast(obj){ lastResponse.textContent = JSON.stringify(obj, null, 2); }
 
@@ -98,18 +110,21 @@
 
     scanBtn.onclick = async ()=>{
       scanResult.textContent = "Scanning…"; scanDebug.textContent="";
+      scanWarning.style.display = "none"; scanWarning.textContent = "";
       try{
         const payload = { subject: subj.value || null, body: body.value || null };
         const r = await fetch("/phishing/predict", { method:"POST", headers: { "Content-Type":"application/json" }, body: JSON.stringify(payload) });
         const j = await r.json();
         showResult(scanResult, j.label, j.probability);
         scanDebug.textContent = "Logged server-side if Mongo is enabled.";
+        toggleWarning(scanWarning, j.label);
         setLast(j);
       }catch(e){ scanResult.textContent = "Error"; scanDebug.textContent = e; }
     };
 
     uploadBtn.onclick = async ()=>{
       uploadResult.textContent = "Uploading…"; uploadDebug.textContent="";
+      uploadWarning.style.display = "none"; uploadWarning.textContent = "";
       const f = emlFile.files[0];
       if(!f){ uploadResult.textContent = "Choose a .eml file first."; return; }
       const form = new FormData(); form.append("file", f);
@@ -118,6 +133,7 @@
         const j = await r.json();
         showResult(uploadResult, j.label, j.probability);
         uploadDebug.textContent = "Logged server-side if Mongo is enabled.";
+        toggleWarning(uploadWarning, j.label);
         setLast(j);
       }catch(e){ uploadResult.textContent = "Error"; uploadDebug.textContent = e; }
     };

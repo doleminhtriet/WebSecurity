@@ -1,5 +1,6 @@
 from pathlib import Path
 import json
+import warnings
 import pandas as pd
 from joblib import dump, load
 from sklearn.linear_model import LogisticRegression
@@ -53,7 +54,23 @@ def train(cfg):
         class_weight=mc.get("class_weight", "balanced"),
         max_iter=mc.get("max_iter", 200),
     )
-    clf = CalibratedClassifierCV(base, method="sigmoid", cv=3).fit(Xtr, ytr)
+    # Ensure calibration folds do not exceed the minority-class count.
+    labels, counts = np.unique(ytr, return_counts=True)
+    if counts.size < 2:
+        raise ValueError("Training data must contain at least two classes.")
+    minority = counts.min()
+    if minority < 3:
+        warnings.warn(
+            f"Only {minority} samples in the smallest class; skipping 3-fold calibration.",
+            RuntimeWarning,
+        )
+    if minority >= 2:
+        cv_folds = max(2, min(3, int(minority)))
+        clf = CalibratedClassifierCV(base, method="sigmoid", cv=cv_folds).fit(Xtr, ytr)
+        calibration_info = {"cv_folds": cv_folds, "calibrated": True}
+    else:
+        clf = base.fit(Xtr, ytr)
+        calibration_info = {"cv_folds": 0, "calibrated": False}
 
     # Eval
     prob = clf.predict_proba(Xva)[:,1]
@@ -70,11 +87,15 @@ def train(cfg):
 
     # Save
     save_artifacts(fitted_vec[0], clf, str(artifacts))
-    (artifacts / "metrics.json").write_text(
-        json.dumps({"pr_auc": pr_auc, "report": report, "suggested_threshold_f1": best_thr}, indent=2),
-        encoding="utf-8",
-    )
-    return {"pr_auc": pr_auc, "suggested_threshold_f1": best_thr, "report": report}
+    metrics = {
+        "pr_auc": pr_auc,
+        "report": report,
+        "suggested_threshold_f1": best_thr,
+        "calibration": calibration_info,
+        "class_counts": dict(zip(map(int, labels), map(int, counts))),
+    }
+    (artifacts / "metrics.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")
+    return metrics
 
 def evaluate(cfg):
     pcfg, dcfg = cfg["phishing"], cfg["phishing"]["data"]

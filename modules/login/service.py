@@ -14,6 +14,7 @@ Notes:
 from __future__ import annotations
 
 import os
+import secrets
 import time
 from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
@@ -31,6 +32,7 @@ security = HTTPBearer(auto_error=False)
 
 _cfg: Dict[str, Any] = {}
 _db = None
+_dev_secret: str | None = None
 
 
 def _load_db():
@@ -52,7 +54,17 @@ def _users_col():
 
 
 def _get_secret() -> str:
-    return os.getenv("SECRET_KEY") or "dev-secret-change-me"
+    """
+    Use SECRET_KEY env when provided; otherwise generate a per-process secret
+    so tokens are invalidated on app restart (forces re-login in dev).
+    """
+    global _dev_secret
+    env_secret = os.getenv("SECRET_KEY")
+    if env_secret:
+        return env_secret
+    if _dev_secret is None:
+        _dev_secret = secrets.token_urlsafe(32)
+    return _dev_secret
 
 
 def _hash_password(password: str) -> str:

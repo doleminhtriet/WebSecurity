@@ -7,7 +7,6 @@ env/
 venv/
 .vscode/
 data/
-artifacts/
 checkpoints/
 *.joblib
 *.pkl

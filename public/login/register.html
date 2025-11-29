@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Register</title>
+  <link rel="stylesheet" href="/app/styles/style.css">
+</head>
+<body>
+  <div class="container">
+    <h2>Register</h2>
+    <p class="msg" id="msg"></p>
+    <form id="regForm">
+      <input type="email" name="email" placeholder="Email" required>
+      <input type="password" name="password" placeholder="Password" required>
+      <button type="submit">Register</button>
+    </form>
+    <p>Already have an account? <a href="/app/login/login.html">Login</a></p>
+  </div>
+  <script>
+    const form = document.getElementById('regForm');
+    const msg = document.getElementById('msg');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      msg.textContent = '';
+      const data = Object.fromEntries(new FormData(form).entries());
+      try {
+        const res = await fetch('/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        const j = await res.json();
+        if (!res.ok) throw new Error(j.detail || 'Register failed');
+        msg.textContent = 'Registered! Redirecting...';
+        setTimeout(() => window.location.href = '/app/login/login.html', 800);
+      } catch (err) {
+        msg.textContent = err.message || 'Error';
+      }
+    });
+  </script>
+</body>
+</html>

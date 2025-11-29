@@ -74,6 +74,7 @@ Open the UI at `http://127.0.0.1:8000/app/index.html`.
 ## MongoDB Helpers
 - Quick connectivity script: `python modules/test/test_mongo.py --insert`.
 - All log documents include timestamps (UTC) and basic metadata (hash, filename, source).
+- Need demo data for the Reporting page? Run `python scripts/seed_reporting.py` (uses `.env`/`config/base.yaml` for Mongo URI and collection names) to insert sample phishing/malware/pcap docs; add `--cleanup` to remove them.
 
 ## Training Workflow (Phishing)
 1. Expand `data/phishing/train.csv` / `valid.csv` with labeled emails (`text,label`).

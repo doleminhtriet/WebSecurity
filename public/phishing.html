@@ -23,6 +23,8 @@
     .bad{background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.35)}
     pre{background:#0e1729;border:1px solid #203156;border-radius:10px;padding:12px;overflow:auto}
     .alert{display:none;margin-top:10px;padding:10px 14px;border-radius:12px;background:#facc15;color:#1f2937;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+    .logout-btn{margin-left:12px;background:#ef4444;border:1px solid #b91c1c;color:#fff;padding:8px 12px;border-radius:10px;cursor:pointer}
+  </style>
   </style>
 </head>
 <body>
@@ -30,7 +32,8 @@
     <h1>Scan Phishing</h1>
     <nav>
       <a href="/">Home</a>
-      &nbsp;|&nbsp; <a href="/docs" target="_blank">API Docs</a>
+      &nbsp;|&nbsp; <!--<a href="/docs" target="_blank">API Docs</a>-->
+      <button id="logoutBtn" class="logout-btn" type="button">Logout</button>
     </nav>
   </header>
 
@@ -84,13 +87,16 @@
     const lastResponse = $("lastResponse");
 
     function showResult(el, label, prob){
-      const p = (prob*100).toFixed(2)+"%";
+      const phishProb = (prob || 0);
+      const p = (phishProb*100).toFixed(2)+"%";
       el.innerHTML = `<span class="pill ${label? 'bad':'ok'}">${label? 'PHISHING':'LEGIT'} • ${p}</span>`;
     }
-    function toggleWarning(box, label){
+    function toggleWarning(box, label, prob){
       if(label){
         box.textContent = "Warning: This message appears to be phishing. Do not click links or download attachments until verified.";
         box.style.display = "block";
+        box.style.background = "#facc15";
+        box.style.color = "#1f2937";
       }else{
         box.textContent = "";
         box.style.display = "none";
@@ -117,7 +123,7 @@
         const j = await r.json();
         showResult(scanResult, j.label, j.probability);
         scanDebug.textContent = "Logged server-side if Mongo is enabled.";
-        toggleWarning(scanWarning, j.label);
+        toggleWarning(scanWarning, j.label, j.probability);
         setLast(j);
       }catch(e){ scanResult.textContent = "Error"; scanDebug.textContent = e; }
     };
@@ -133,7 +139,7 @@
         const j = await r.json();
         showResult(uploadResult, j.label, j.probability);
         uploadDebug.textContent = "Logged server-side if Mongo is enabled.";
-        toggleWarning(uploadWarning, j.label);
+        toggleWarning(uploadWarning, j.label, j.probability);
         setLast(j);
       }catch(e){ uploadResult.textContent = "Error"; uploadDebug.textContent = e; }
     };

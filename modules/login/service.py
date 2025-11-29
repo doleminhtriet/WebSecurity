@@ -1,0 +1,156 @@
+"""
+Simple authentication module using MongoDB-backed users.
+
+Endpoints:
+- POST /auth/register : create user (email + password)
+- POST /auth/login    : authenticate and return JWT
+- GET  /auth/me       : validate token and return user info
+
+Notes:
+- Expects a Mongo collection "users" with documents containing:
+  { email, password_hash } (bcrypt) or legacy { email, password } (plaintext fallback)
+- Set SECRET_KEY in environment for JWT signing; a dev default is used otherwise.
+"""
+from __future__ import annotations
+
+import os
+import time
+from datetime import datetime, timedelta
+from typing import Any, Dict, Optional
+
+import bcrypt
+import jwt
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
+from core.config import load_config
+from core.db.mongodb import get_db
+
+router = APIRouter(prefix="/auth", tags=["auth"])
+security = HTTPBearer(auto_error=False)
+
+_cfg: Dict[str, Any] = {}
+_db = None
+
+
+def _load_db():
+    global _cfg, _db
+    _cfg = load_config()
+    try:
+        _db = get_db(_cfg)
+    except Exception:
+        _db = None
+
+
+def _users_col():
+    if _db is None:
+        return None
+    try:
+        return _db["users"]
+    except Exception:
+        return None
+
+
+def _get_secret() -> str:
+    return os.getenv("SECRET_KEY") or "dev-secret-change-me"
+
+
+def _hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+
+def _verify_password(password: str, stored: str) -> bool:
+    if not stored:
+        return False
+    try:
+        return bcrypt.checkpw(password.encode("utf-8"), stored.encode("utf-8"))
+    except ValueError:
+        # fallback: plain text match
+        return password == stored
+
+
+def _make_token(email: str, expires_minutes: int = 60 * 24) -> str:
+    exp = datetime.utcnow() + timedelta(minutes=expires_minutes)
+    payload = {"sub": email, "exp": exp, "iat": datetime.utcnow()}
+    return jwt.encode(payload, _get_secret(), algorithm="HS256")
+
+
+def _decode_token(token: str) -> str:
+    try:
+        data = jwt.decode(token, _get_secret(), algorithms=["HS256"])
+        return data["sub"]
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+
+def _get_current_user(creds: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> Dict[str, Any]:
+    if creds is None:
+        raise HTTPException(status_code=401, detail="Missing credentials")
+    email = _decode_token(creds.credentials)
+    col = _users_col()
+    if col is None:
+        raise HTTPException(status_code=503, detail="Auth database unavailable")
+    user = col.find_one({"email": email})
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+    user["_id"] = str(user["_id"])
+    user.pop("password_hash", None)
+    user.pop("password", None)
+    return user
+
+
+@router.post("/register")
+def register(payload: Dict[str, str]) -> Dict[str, Any]:
+    """
+    Create a new user. Requires mongodb.enabled and a "users" collection.
+    """
+    col = _users_col()
+    if col is None:
+        raise HTTPException(status_code=503, detail="Auth database unavailable")
+
+    email = (payload.get("email") or "").strip().lower()
+    password = payload.get("password") or ""
+    if not email or not password:
+        raise HTTPException(status_code=400, detail="Email and password are required")
+
+    if col.find_one({"email": email}):
+        raise HTTPException(status_code=400, detail="User already exists")
+
+    col.insert_one({
+        "email": email,
+        "password_hash": _hash_password(password),
+        "created_at": datetime.utcnow(),
+    })
+    return {"ok": True, "message": "Registered"}
+
+
+@router.post("/login")
+def login(payload: Dict[str, str]) -> Dict[str, Any]:
+    col = _users_col()
+    if col is None:
+        raise HTTPException(status_code=503, detail="Auth database unavailable")
+
+    email = (payload.get("email") or "").strip().lower()
+    password = payload.get("password") or ""
+    if not email or not password:
+        raise HTTPException(status_code=400, detail="Email and password are required")
+
+    user = col.find_one({"email": email})
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    stored = user.get("password_hash") or user.get("password")
+    if not _verify_password(password, stored):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    token = _make_token(email)
+    return {"token": token, "user": {"email": email}}
+
+
+@router.get("/me")
+def me(user=Depends(_get_current_user)) -> Dict[str, Any]:
+    return {"user": user}
+
+
+# Initialize on import
+_load_db()

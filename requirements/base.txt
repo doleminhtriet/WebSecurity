@@ -4,6 +4,9 @@ pydantic>=1.10,<3
 PyYAML
 python-dotenv
 pymongo[srv]
+pyjwt
+bcrypt
+motor
 joblib
 scikit-learn
 numpy

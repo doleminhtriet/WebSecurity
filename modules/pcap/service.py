@@ -6,6 +6,7 @@ lightweight analytics with Scapy, and returns structured JSON results.
 """
 from __future__ import annotations
 
+import logging
 import os
 import tempfile
 from collections import Counter, defaultdict
@@ -13,6 +14,8 @@ from datetime import datetime
 from typing import Any, Dict, List
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
+
+from modules.pcap.database import get_database
 
 try:  # pragma: no cover - optional dependency
     from scapy.all import rdpcap  # type: ignore
@@ -31,6 +34,10 @@ except ImportError as exc:  # pragma: no cover
 
 
 router = APIRouter(prefix="/pcap", tags=["pcap"])
+logger = logging.getLogger(__name__)
+
+_db = get_database()
+_db_ready = False
 
 
 @router.get("/health")
@@ -42,6 +49,48 @@ def health() -> Dict[str, Any]:
         "analyze_endpoint": "/pcap/analyze",
         "timestamp": datetime.utcnow().isoformat() + "Z",
     }
+
+
+async def _ensure_db_ready() -> bool:
+    """Connect to Mongo (if configured) and ensure indexes exist."""
+    global _db_ready
+    if _db is None or _db_ready:
+        return _db_ready
+    try:
+        ok = await _db.connect()
+        if not ok:
+            return False
+        await _db.initialize_indexes()
+        _db_ready = True
+    except Exception:
+        logger.exception("Mongo logging unavailable for PCAP module")
+        return False
+    return _db_ready
+
+
+async def _log_analysis(filename: str, analysis: Dict[str, Any]) -> None:
+    """Persist analysis and threat findings if Mongo is available."""
+    if not await _ensure_db_ready():
+        return
+
+    try:
+        await _db.save_analysis(filename, analysis)
+
+        syn_flood = (analysis.get("detections", {}) or {}).get("syn_flood", []) or []
+        threat_level = "High" if any(alert.get("severity") == "high" for alert in syn_flood) else ("Medium" if syn_flood else "Low")
+        threat_summary = {
+            "overall_threat_level": threat_level,
+            "syn_flood_alerts": len(syn_flood),
+        }
+        await _db.save_threats(
+            filename,
+            {
+                "threat_summary": threat_summary,
+                "syn_flood_detection": syn_flood,
+            },
+        )
+    except Exception:
+        logger.exception("Failed to log PCAP analysis to Mongo")
 
 
 @router.post("/analyze")
@@ -82,6 +131,7 @@ async def analyze_pcap(file: UploadFile = File(...)) -> Dict[str, Any]:
         analysis["detections"] = {
             "syn_flood": detect_syn_flood(packets),
         }
+        await _log_analysis(file.filename, analysis)
         return analysis
     except HTTPException:
         raise

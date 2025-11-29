@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Welcome</title>
+  <link rel="stylesheet" href="/app/styles/style.css">
+</head>
+<body>
+  <div class="container">
+    <h2 id="welcome">Welcome 👋</h2>
+    <a class="logout" id="logout" href="#">Logout</a>
+  </div>
+  <script>
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      window.location.href = '/app/login/login.html';
+    }
+    fetch('/auth/me', { headers: { Authorization: 'Bearer ' + token }})
+      .then(r=>r.json())
+      .then(j=>{
+        if (j.user?.email) document.getElementById('welcome').textContent = 'Welcome, ' + j.user.email + ' 👋';
+      })
+      .catch(()=>{ window.location.href='/app/login/login.html'; });
+    document.getElementById('logout').onclick = (e)=>{
+      e.preventDefault();
+      localStorage.removeItem('authToken');
+      window.location.href = '/app/login/login.html';
+    };
+  </script>
+</body>
+</html>

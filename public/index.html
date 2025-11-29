@@ -18,13 +18,25 @@
     .btn{display:inline-block;margin-top:10px;background:var(--accent);border:1px solid #2b59c3;color:#fff;padding:10px 14px;border-radius:12px}
     footer{color:var(--muted);text-align:center;padding:24px}
     nav a{margin-left:12px}
+    .logout-btn{margin-left:12px;background:#ef4444;border:1px solid #b91c1c;color:#fff;padding:8px 12px;border-radius:10px;cursor:pointer}
   </style>
 </head>
 <body>
+  <script>
+    const token = localStorage.getItem('authToken');
+    if(!token){
+      window.location.href = '/app/login/login.html';
+    }else{
+      fetch('/auth/me',{headers:{Authorization:'Bearer '+token}})
+        .then(r=>r.ok?r.json():Promise.reject())
+        .catch(()=>{localStorage.removeItem('authToken');window.location.href='/app/login/login.html';});
+    }
+  </script>
   <header class="wrap">
     <h1>Defense Capstone</h1>
     <nav>
-      <a href="/docs" target="_blank">API Docs</a>
+      <!--<a href="/docs" target="_blank">API Docs</a> -->
+      <button id="logoutBtn" class="logout-btn" type="button">Logout</button>
     </nav>
   </header>
 
@@ -57,5 +69,12 @@
   </main>
 
   <footer>© Seciurity Web</footer>
+
+  <script>
+    document.getElementById('logoutBtn')?.addEventListener('click', () => {
+      localStorage.removeItem('authToken');
+      window.location.href = '/app/login/login.html';
+    });
+  </script>
 </body>
 </html>

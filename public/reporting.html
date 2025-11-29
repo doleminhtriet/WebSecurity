@@ -5,23 +5,275 @@
   <title>Defense Capstone – Reporting</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    body{margin:0;background:#0b1220;color:#e6edf3;font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu}
-    .wrap{max-width:900px;margin:0 auto;padding:24px}
-    header{padding:20px;border-bottom:1px solid #1e2a44;display:flex;align-items:center;justify-content:space-between}
-    a{color:#7cc7ff;text-decoration:none}
-    .card{background:#121a2a;border:1px solid #203156;border-radius:16px;padding:18px;box-shadow:0 4px 14px rgba(0,0,0,.25)}
-    .muted{color:#9fb1c7}
+    :root {
+      --bg:#0b1220; --card:#111a2a; --card2:#0f1627; --text:#e6edf3; --muted:#9fb1c7; --accent:#4f8bff; --accent2:#22d3ee;
+      --border:#1f2c44; --ok:#10b981; --warn:#f59e0b; --bad:#ef4444;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:radial-gradient(circle at 20% 20%, rgba(79,139,255,0.08), transparent 35%),radial-gradient(circle at 80% 10%, rgba(34,211,238,0.07), transparent 32%),var(--bg);color:var(--text);font:15px/1.5 "Segoe UI",system-ui,-apple-system,sans-serif;min-height:100vh;}
+    header{padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;backdrop-filter:blur(6px);position:sticky;top:0;background:rgba(11,18,32,0.85);}
+    h1{margin:0;font-size:20px;}
+    a{color:#7cc7ff;text-decoration:none;}
+    .wrap{max-width:1100px;margin:0 auto;padding:22px;}
+    .grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));}
+    .card{background:linear-gradient(160deg,var(--card),var(--card2));border:1px solid var(--border);border-radius:16px;padding:18px;box-shadow:0 6px 24px rgba(0,0,0,0.35);}
+    .row{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+    .pill{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;font-size:12px;border:1px solid var(--border);color:var(--muted);}
+    .muted{color:var(--muted);}
+    table{width:100%;border-collapse:collapse;font-size:13px;}
+    th,td{padding:8px 6px;text-align:left;border-bottom:1px solid var(--border);}
+    th{color:var(--muted);}
+    .metric{font-size:28px;font-weight:700;}
+    .subtitle{margin:0;color:var(--muted);}
+    .section-title{margin:0 0 10px 0;font-size:16px;}
+    button{background:linear-gradient(90deg,var(--accent),var(--accent2));border:0;color:white;padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:600;box-shadow:0 6px 18px rgba(79,139,255,0.25);}
+    button:disabled{opacity:0.6;cursor:not-allowed;box-shadow:none;}
+    .scroll{max-height:360px;overflow:auto;border:1px solid var(--border);border-radius:12px;}
+    .tab-btn{background:rgba(79,139,255,0.15);border:1px solid var(--border);box-shadow:none;}
+    input[type="date"], input[type="number"]{background:var(--card2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:6px;}
+    .alert-strip{margin-bottom:12px;min-height:24px;color:var(--muted);}
   </style>
 </head>
 <body>
+  <script>
+    const token = localStorage.getItem('authToken');
+    if(!token){
+      window.location.href = '/app/login/login.html';
+    }else{
+      fetch('/auth/me',{headers:{Authorization:'Bearer '+token}})
+        .then(r=>r.ok?r.json():Promise.reject())
+        .catch(()=>{localStorage.removeItem('authToken');window.location.href='/app/login/login.html';});
+    }
+  </script>
   <header class="wrap">
     <h1>Reporting</h1>
     <nav><a href="/">Home</a> &nbsp;|&nbsp; <a href="/docs" target="_blank">API Docs</a></nav>
   </header>
   <main class="wrap">
+    <div class="row" style="margin-bottom:12px;gap:12px;flex-wrap:wrap">
+      <div class="pill" id="mongoStatus">Checking Mongo…</div>
+      <div class="row" style="gap:8px;flex-wrap:wrap">
+        <label class="muted">From</label><input type="date" id="fromDate" />
+        <label class="muted">To</label><input type="date" id="toDate" />
+        <label class="muted">Limit</label><input type="number" id="limitInput" min="1" max="100" value="5" style="width:70px" />
+      </div>
+      <div class="row" style="gap:8px;flex-wrap:wrap">
+        <button id="applyFilters">Apply</button>
+        <button id="refreshBtn">Refresh</button>
+        <button id="exportBtn" style="background:linear-gradient(90deg,#22c55e,#16a34a)">Export CSV</button>
+      </div>
+    </div>
+
+    <section class="card" style="margin-bottom:16px">
+      <h2 class="section-title">Overview</h2>
+      <p class="subtitle">Aggregated counts across phishing, malware, and PCAP modules.</p>
+      <div class="grid" id="metricGrid"></div>
+    </section>
+
     <section class="card">
-      <p class="muted">Placeholder page. Build charts from Mongo logs and export CSV/PDF here.</p>
+      <h2 class="section-title">Recent Activity</h2>
+      <p class="subtitle">Latest items per module. Use the tabs and filters to narrow results.</p>
+      <div class="row" style="gap:10px;margin-bottom:12px;flex-wrap:wrap">
+        <button class="tab-btn" data-tab="phishing">Phishing</button>
+        <button class="tab-btn" data-tab="malware">Malware</button>
+        <button class="tab-btn" data-tab="pcap">PCAP Analyses</button>
+        <button class="tab-btn" data-tab="threats">PCAP Threats</button>
+      </div>
+      <div class="alert-strip" id="alertStrip"></div>
+      <div class="scroll"><table id="mainTable"></table></div>
     </section>
   </main>
+
+  <script>
+    const $ = id => document.getElementById(id);
+    const metricGrid = $("metricGrid");
+    const mongoStatus = $("mongoStatus");
+    const mainTable = $("mainTable");
+    const alertStrip = $("alertStrip");
+    let currentTab = "phishing";
+    let lastData = null;
+
+    document.querySelectorAll(".tab-btn").forEach(btn=>{
+      btn.onclick = ()=>{ currentTab = btn.dataset.tab; setActiveTab(); renderTab(); };
+    });
+    $("refreshBtn").onclick = () => { $("refreshBtn").disabled = true; loadData().finally(() => $("refreshBtn").disabled = false); };
+    $("applyFilters").onclick = () => loadData();
+    $("exportBtn").onclick = () => exportData();
+
+    function setMongoStatus(ok, dbName){
+      if(ok){
+        mongoStatus.textContent = `Mongo connected (${dbName || "default"})`;
+        mongoStatus.style.borderColor = "rgba(16,185,129,0.4)";
+        mongoStatus.style.color = "var(--ok)";
+      }else{
+        mongoStatus.textContent = "Mongo not connected";
+        mongoStatus.style.borderColor = "rgba(239,68,68,0.4)";
+        mongoStatus.style.color = "var(--bad)";
+      }
+    }
+
+    function setActiveTab(){
+      document.querySelectorAll(".tab-btn").forEach(btn=>{
+        btn.style.opacity = btn.dataset.tab === currentTab ? "1" : "0.65";
+        btn.style.filter = btn.dataset.tab === currentTab ? "none" : "grayscale(0.3)";
+      });
+    }
+
+    function renderMetrics(counts){
+      const entries = [
+        { label: "Phishing predictions", val: counts.phishing_predictions },
+        { label: "Malware scans", val: counts.malware_scans },
+        { label: "PCAP analyses", val: counts.pcap_analyses },
+        { label: "PCAP threats", val: counts.pcap_threats },
+      ];
+      metricGrid.innerHTML = entries.map(e => `
+        <div class="card" style="padding:14px">
+          <div class="metric">${e.val ?? 0}</div>
+          <div class="muted">${e.label}</div>
+        </div>
+      `).join("");
+    }
+
+    function badge(level){
+      const map = { high:["🔴","High"], medium:["🟠","Medium"], low:["🟢","Low"], warn:["🟠","Warning"], ok:["🟢","Normal"] };
+      const key = (level||"").toLowerCase();
+      const [icon,text] = map[key] || ["🟢","Normal"];
+      return `<span class="pill">${icon} ${text}</span>`;
+    }
+
+    function shapePhish(rows){
+      return rows.map(r=>({
+        ts: r.ts || r.timestamp || "",
+        label: r.label ?? "",
+        prob: r.probability ?? "",
+        source: r.source || "",
+        subject: r.subject || "",
+        severity: (r.label === 1) ? "high" : "low",
+      }));
+    }
+    function shapeMalware(rows){
+      return rows.map(r=>({
+        ts: r.ts || r.timestamp || "",
+        label: r.label ?? "",
+        prob: r.probability ?? "",
+        filename: r.filename || "",
+        sha: (r.sha256 || "").slice(0,10)+"…",
+        severity: (r.label === 1) ? "high" : "low",
+      }));
+    }
+    function shapePcap(rows){
+      return rows.map(r=>({
+        timestamp: r.timestamp || "",
+        filename: r.filename || "",
+        packets: (r.basic_stats||{}).total_packets ?? "",
+        bytes: (r.basic_stats||{}).total_bytes ?? "",
+        severity: "low",
+      }));
+    }
+    function shapeThreat(rows){
+      return rows.map(r=>({
+        timestamp: r.timestamp || "",
+        filename: r.filename || "",
+        level: ((r.threat_summary||{}).overall_threat_level)||"",
+        syn_alerts: (r.threat_summary||{}).syn_flood_alerts ?? "",
+        severity: ((r.threat_summary||{}).overall_threat_level||"").toLowerCase() || "low",
+      }));
+    }
+
+    function renderTab(){
+      if(!lastData) return;
+      let rows = [], columns = [];
+      if(currentTab==="phishing"){
+        rows = shapePhish((lastData.recent||{}).phishing_predictions || []);
+        columns = ["ts","severity","label","prob","subject","source"];
+      }else if(currentTab==="malware"){
+        rows = shapeMalware((lastData.recent||{}).malware_scans || []);
+        columns = ["ts","severity","label","prob","filename","sha"];
+      }else if(currentTab==="pcap"){
+        rows = shapePcap((lastData.recent||{}).pcap_analyses || []);
+        columns = ["timestamp","severity","filename","packets","bytes"];
+      }else{
+        rows = shapeThreat((lastData.recent||{}).pcap_threats || []);
+        columns = ["timestamp","severity","filename","level","syn_alerts"];
+      }
+
+      const top = rows.slice(0,2);
+      if(top.length){
+        alertStrip.innerHTML = top.map(r=>`${badge(r.severity)} ${r.filename||r.source||r.ts||r.timestamp||""}`).join(" | ");
+      }else{
+        alertStrip.innerHTML = `<span class="muted">No recent entries. Run a scan or seed sample data with scripts/seed_reporting.py.</span>`;
+      }
+
+      if(rows.length === 0){
+        mainTable.innerHTML = `<tr><td class="muted">No data</td></tr>`;
+        return;
+      }
+      const head = `<tr>${columns.map(c=>`<th>${c}</th>`).join("")}</tr>`;
+      const body = rows.map(r=>{
+        return `<tr>${columns.map(c=>{
+          if(c==="severity") return `<td>${badge(r.severity)}</td>`;
+          let val = r[c] ?? "";
+          if(typeof val === "object") val = JSON.stringify(val);
+          return `<td>${val}</td>`;
+        }).join("")}</tr>`;
+      }).join("");
+      mainTable.innerHTML = head + body;
+    }
+
+    function getFilters(){
+      const fromDate = $("fromDate").value ? new Date($("fromDate").value) : null;
+      const toDate = $("toDate").value ? new Date($("toDate").value) : null;
+      const limit = parseInt($("limitInput").value || "5", 10);
+      return { fromDate, toDate, limit };
+    }
+
+    async function loadData(){
+      try{
+        const health = await fetch("/reporting/health").then(r=>r.json());
+        setMongoStatus(health.mongodb_connected, health.database);
+      }catch(e){
+        setMongoStatus(false);
+      }
+
+      try{
+        const { fromDate, toDate, limit } = getFilters();
+        const params = new URLSearchParams({ limit: String(limit || 5) });
+        if(fromDate) params.append("from_ts", fromDate.toISOString());
+        if(toDate) params.append("to_ts", toDate.toISOString());
+        const data = await fetch(`/reporting/summary?${params.toString()}`).then(r=>r.json());
+        lastData = data;
+        renderMetrics(data.counts || {});
+        renderTab();
+      }catch(e){
+        metricGrid.innerHTML = `<div class="muted">Error loading summary: ${e}</div>`;
+        mainTable.innerHTML = `<tr><td class="muted">Error</td></tr>`;
+      }
+    }
+
+    async function exportData(){
+      try{
+        const { fromDate, toDate, limit } = getFilters();
+        const kindMap = { phishing:"phishing", malware:"malware", pcap:"pcap_analyses", threats:"pcap_threats" };
+        const kind = kindMap[currentTab];
+        const params = new URLSearchParams({ kind, format:"csv", limit:String(limit||500) });
+        if(fromDate) params.append("from_ts", fromDate.toISOString());
+        if(toDate) params.append("to_ts", toDate.toISOString());
+        const res = await fetch(`/reporting/export?${params.toString()}`);
+        const text = await res.text();
+        const blob = new Blob([text], { type: "text/csv" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${kind}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }catch(e){
+        alert("Export failed: "+e);
+      }
+    }
+
+    setActiveTab();
+    loadData();
+  </script>
 </body>
 </html>

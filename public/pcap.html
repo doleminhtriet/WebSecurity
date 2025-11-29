@@ -1,336 +1,481 @@
-
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Simple PCAP Analyzer</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>PCAP Analyzer</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        
+        :root {
+            --accent-1: #5b6ef1;
+            --accent-2: #6e52b8;
+            --muted: #6b7280;
+            --bg: #f4f6fb;
+            --card: #ffffff;
+            --success: #28a745;
+            --radius: 12px;
+        }
+
+        html, body {
+            height: 100%;
+            margin: 0;
+            font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+        }
+
         body {
-            font-family: Arial, sans-serif;
-            max-width: 1000px;
-            margin: 0 auto;
-            padding: 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
+            background: linear-gradient(180deg, var(--bg), #eef2ff 60%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 28px;
+            color: #111827;
         }
-        .container {
-            background: white;
-            padding: 30px;
-            border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+
+        .wrap {
+            width: 100%;
+            max-width: 1100px;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), var(--card));
+            border-radius: var(--radius);
+            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+            padding: 22px;
+            backdrop-filter: blur(6px);
         }
+
+        header {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            margin-bottom: 18px;
+        }
+
+        .logo {
+            width: 52px;
+            height: 52px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            box-shadow: 0 6px 18px rgba(99, 102, 241, 0.15);
+            flex-shrink: 0;
+        }
+
         h1 {
-            color: #333;
-            text-align: center;
-            margin-bottom: 30px;
+            font-size: 20px;
+            margin: 0;
         }
-        .upload-area {
-            border: 2px dashed #667eea;
-            border-radius: 10px;
-            padding: 40px;
-            text-align: center;
-            margin-bottom: 30px;
-            background: #f8f9fa;
+
+        p.lead {
+            margin: 0;
+            color: var(--muted);
+            font-size: 13px;
         }
-        input[type="file"] {
-            display: none;
-        }
-        .upload-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 12px 30px;
-            border: none;
-            border-radius: 25px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        .upload-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-        }
-        .analyze-btn {
-            background: #28a745;
-            color: white;
-            padding: 10px 25px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-            margin-top: 15px;
-            display: none;
-        }
-        .results {
-            display: none;
-            margin-top: 30px;
-        }
-        .stat-grid {
+
+        .main {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-bottom: 30px;
+            grid-template-columns: 360px 1fr;
+            gap: 20px;
+            margin-top: 18px;
         }
-        .stat-card {
-            background: #f8f9fa;
-            padding: 20px;
+
+        .panel {
+            background: var(--card);
             border-radius: 10px;
-            border-left: 4px solid #667eea;
+            padding: 16px;
+            box-shadow: 0 6px 18px rgba(15, 23, 42, 0.03);
         }
-        .stat-label {
-            color: #666;
+
+        .drop {
+            border: 1px dashed rgba(99, 102, 241, 0.18);
+            padding: 18px;
+            border-radius: 10px;
+            text-align: center;
+            background: linear-gradient(180deg, rgba(99, 102, 241, 0.03), rgba(99, 102, 241, 0.01));
+        }
+
+        .file-label {
+            display: inline-block;
+            padding: 10px 16px;
+            background: linear-gradient(90deg, var(--accent-1), var(--accent-2));
+            color: #fff;
+            border-radius: 999px;
+            cursor: pointer;
+            margin-top: 12px;
+            font-weight: 600;
             font-size: 14px;
-            margin-bottom: 5px;
+            box-shadow: 0 6px 14px rgba(99, 102, 241, 0.12);
         }
-        .stat-value {
-            color: #333;
-            font-size: 24px;
-            font-weight: bold;
+
+        #file-input {
+            display: none;
         }
-        .section {
-            margin-bottom: 30px;
+
+        .meta {
+            margin-top: 12px;
+            color: var(--muted);
+            font-size: 13px;
+            text-align: center;
         }
-        .section h3 {
-            color: #333;
-            border-bottom: 2px solid #667eea;
-            padding-bottom: 10px;
-            margin-bottom: 15px;
+
+        .btn-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            justify-content: center;
+            margin-top: 14px;
         }
+
+        .btn {
+            padding: 10px 14px;
+            border-radius: 10px;
+            border: 0;
+            cursor: pointer;
+            font-weight: 600;
+            background: var(--accent-1);
+            color: #fff;
+        }
+
+        .btn.ghost {
+            background: transparent;
+            color: var(--accent-2);
+            border: 1px solid rgba(101, 84, 199, 0.12);
+            font-weight: 600;
+        }
+
+        .btn.success {
+            background: var(--success);
+        }
+
+        .loading {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 0;
+            color: var(--muted);
+        }
+
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 3px solid rgba(0, 0, 0, 0.06);
+            border-top-color: var(--accent-2);
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .content-panel {
+            padding: 0;
+        }
+
+        .stats {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 14px;
+        }
+
+        .stat {
+            background: var(--card);
+            padding: 12px;
+            border-radius: 10px;
+            min-width: 160px;
+            flex: 1;
+            box-shadow: 0 6px 18px rgba(15, 23, 42, 0.03);
+        }
+
+        .stat .label {
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        .stat .value {
+            font-weight: 700;
+            font-size: 20px;
+            margin-top: 6px;
+        }
+
+        section.h {
+            margin-bottom: 16px;
+        }
+
+        h3 {
+            margin: 0 0 10px 0;
+            font-size: 15px;
+            color: #111827;
+        }
+
         table {
             width: 100%;
             border-collapse: collapse;
+            font-size: 13px;
         }
+
         th, td {
-            padding: 10px;
+            padding: 8px 6px;
             text-align: left;
-            border-bottom: 1px solid #ddd;
+            border-bottom: 1px solid #eef2ff;
+            color: #374151;
         }
+
         th {
-            background: #f8f9fa;
-            font-weight: bold;
+            font-weight: 600;
+            color: var(--muted);
+            background: transparent;
         }
-        .loading {
-            display: none;
-            text-align: center;
-            margin: 20px 0;
+
+        canvas {
+            width: 100% !important;
+            height: 160px !important;
+            border-radius: 8px;
+            background: transparent;
         }
-        .spinner {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #667eea;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+
+        @media (max-width: 920px) {
+            .main {
+                grid-template-columns: 1fr;
+            }
+
+            .stats .stat {
+                min-width: 120px;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🔍 Simple PCAP Analyzer</h1>
-        
-        <div class="upload-area">
-            <label for="file-input" class="upload-btn">Choose PCAP File</label>
-            <input type="file" id="file-input" accept=".pcap,.pcapng">
-            <p id="file-name" style="margin-top: 15px; color: #666;">No file selected</p>
-            <button class="analyze-btn" id="analyze-btn" onclick="analyzeFile()">Analyze PCAP</button>
-        </div>
-        
-        <div class="loading" id="loading">
-            <div class="spinner"></div>
-            <p>Analyzing your PCAP file...</p>
-        </div>
-        
-        <div class="results" id="results">
-            <div class="stat-grid" id="stats"></div>
-            <div class="section" id="protocols"></div>
-            <div class="section" id="top-talkers"></div>
-            <div class="section" id="packet-details"></div>
+    <script>
+        const token = localStorage.getItem('authToken');
+        if(!token){
+            window.location.href = '/app/login/login.html';
+        }else{
+            fetch('/auth/me',{headers:{Authorization:'Bearer '+token}})
+              .then(r=>r.ok?r.json():Promise.reject())
+              .catch(()=>{localStorage.removeItem('authToken');window.location.href='/app/login/login.html';});
+        }
+    </script>
+    <div class="wrap" role="main">
+        <header>
+            <div class="logo">PC</div>
+            <div>
+                <h1>PCAP Analyzer</h1>
+            </div>
+        </header>
+
+        <div class="main">
+            <div class="panel" aria-labelledby="upload-title">
+                <h3 id="upload-title">Upload</h3>
+                <div class="drop" id="dropzone" aria-hidden="false">
+                    <p style="margin:0;color:var(--muted)">Drag & drop or choose a file</p>
+                    <label class="file-label" for="file-input">Choose PCAP</label>
+                    <input id="file-input" type="file" accept=".pcap,.pcapng" />
+                    <p class="meta" id="file-name">No file selected</p>
+
+                    <div class="btn-row">
+                        <button class="btn success" id="analyze-btn" style="display:none">Analyze</button>
+                        <button class="btn ghost" id="clear-btn" type="button">Clear</button>
+                    </div>
+
+                    <div id="loading" class="loading" style="display:none">
+                        <div class="spinner" aria-hidden="true"></div>
+                        <div>Analyzing...</div>
+                    </div>
+                </div>
+
+                <div style="margin-top:14px;color:var(--muted);font-size:13px">
+                    <strong>Note:</strong> Analysis results are automatically saved to MongoDB.
+                </div>
+            </div>
+
+            <div class="content-panel">
+                <div id="results" style="display:none">
+                    <div class="stats" id="stats"></div>
+
+                    <div class="panel" style="padding:12px;margin-bottom:12px">
+                        <h3>Protocol Distribution</h3>
+                        <table id="protocols"></table>
+                    </div>
+
+                    <div class="panel" style="padding:12px;margin-bottom:12px">
+                        <h3>Top Talkers (Source IPs)</h3>
+                        <table id="top-talkers"></table>
+                    </div>
+
+                    <div class="panel" style="padding:12px;margin-bottom:12px">
+                        <h3>Charts</h3>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                            <div>
+                                <small style="color:var(--muted)">Protocol</small>
+                                <canvas id="protocolPie"></canvas>
+                            </div>
+                            <div>
+                                <small style="color:var(--muted)">Top Talkers</small>
+                                <canvas id="topTalkersBar"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <h3>First 10 Packets</h3>
+                        <div style="overflow:auto;max-height:260px">
+                            <table id="packet-details"></table>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="empty-state" class="panel" style="margin-top:12px">
+                    <h3 style="margin-bottom:6px">No data yet</h3>
+                    <p class="lead" style="margin-top:0;color:var(--muted)">Choose a pcap file to see analysis results.</p>
+                </div>
+            </div>
         </div>
     </div>
-    
+
     <script>
+        let charts = [];
         const fileInput = document.getElementById('file-input');
         const fileName = document.getElementById('file-name');
         const analyzeBtn = document.getElementById('analyze-btn');
+        const clearBtn = document.getElementById('clear-btn');
+        const loadingEl = document.getElementById('loading');
+        const resultsEl = document.getElementById('results');
+        const emptyEl = document.getElementById('empty-state');
+
         let selectedFile = null;
-        
-        fileInput.addEventListener('change', function(e) {
-            selectedFile = e.target.files[0];
+
+        fileInput.addEventListener('change', (e) => {
+            selectedFile = e.target.files[0] ?? null;
             if (selectedFile) {
                 fileName.textContent = 'Selected: ' + selectedFile.name;
                 analyzeBtn.style.display = 'inline-block';
+            } else {
+                fileName.textContent = 'No file selected';
+                analyzeBtn.style.display = 'none';
             }
         });
-        
+
+        clearBtn.addEventListener('click', () => {
+            fileInput.value = '';
+            selectedFile = null;
+            fileName.textContent = 'No file selected';
+            analyzeBtn.style.display = 'none';
+            resultsEl.style.display = 'none';
+            emptyEl.style.display = 'block';
+            destroyCharts();
+        });
+
+        analyzeBtn.addEventListener('click', analyzeFile);
+
         async function analyzeFile() {
             if (!selectedFile) return;
-            
+            loadingEl.style.display = 'flex';
+            resultsEl.style.display = 'none';
+            emptyEl.style.display = 'none';
+
             const formData = new FormData();
             formData.append('file', selectedFile);
-            
-            document.getElementById('loading').style.display = 'block';
-            document.getElementById('results').style.display = 'none';
-            
+
             try {
-                const response = await fetch('/pcap/analyze', {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                const data = await response.json();
-                if (data?.detail) {
-                    throw new Error(data.detail);
+                const resp = await fetch('/pcap/analyze', { method: 'POST', body: formData });
+                if (!resp.ok) {
+                    let detail = '';
+                    try {
+                        const errData = await resp.json();
+                        detail = errData?.detail ? ': ' + errData.detail : '';
+                    } catch (e) { /* ignore parse errors */ }
+                    throw new Error('Server error ' + resp.status + detail);
                 }
-                if (!data?.basic_stats) {
-                    throw new Error("Analyzer returned no statistics.");
-                }
+                const data = await resp.json();
+                if (!data?.basic_stats) throw new Error('Analyzer returned no statistics.');
                 displayResults(data);
-            } catch (error) {
-                alert('Error analyzing file: ' + error.message);
+            } catch (err) {
+                alert('Error: ' + (err.message || err));
+                resultsEl.style.display = 'none';
+                emptyEl.style.display = 'block';
+                destroyCharts();
             } finally {
-                document.getElementById('loading').style.display = 'none';
+                loadingEl.style.display = 'none';
             }
         }
-        
+
+        function destroyCharts() {
+            charts.forEach(c => { try { c.destroy(); } catch (e) {} });
+            charts = [];
+        }
+
         function displayResults(data) {
-            // Display basic stats
-            const statsHtml = `
-                <div class="stat-card">
-                    <div class="stat-label">Total Packets</div>
-                    <div class="stat-value">${data.basic_stats.total_packets}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">Capture Duration</div>
-                    <div class="stat-value">${data.basic_stats.duration}s</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">Unique IPs</div>
-                    <div class="stat-value">${data.basic_stats.unique_ips}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">Total Size</div>
-                    <div class="stat-value">${data.basic_stats.total_bytes} bytes</div>
-                </div>
-            `;
-            document.getElementById('stats').innerHTML = statsHtml;
-            
-            // Display protocol distribution
-            let protocolHtml = '<h3>Protocol Distribution</h3><table><tr><th>Protocol</th><th>Count</th><th>Percentage</th></tr>';
-            for (const [protocol, count] of Object.entries(data.protocol_stats)) {
-                const percentage = ((count / data.basic_stats.total_packets) * 100).toFixed(1);
-                protocolHtml += `<tr><td>${protocol}</td><td>${count}</td><td>${percentage}%</td></tr>`;
-            }
-            protocolHtml += '</table>';
-            document.getElementById('protocols').innerHTML = protocolHtml;
-            
-            // Display top talkers
-            let talkersHtml = '<h3>Top Talkers (Source IPs)</h3><table><tr><th>IP Address</th><th>Packet Count</th></tr>';
-            for (const [ip, count] of data.top_talkers) {
-                talkersHtml += `<tr><td>${ip}</td><td>${count}</td></tr>`;
-            }
-            talkersHtml += '</table>';
-            document.getElementById('top-talkers').innerHTML = talkersHtml;
+            destroyCharts();
 
-            // Insert charts section
-            let chartsSection = `
-                <section id="charts" style="margin-top: 20px;">
-                    <h2>Charts</h2>
-                    <h3>Protocol Distribution</h3>
-                    <canvas id="protocolPie" height="120"></canvas>
-                    <h3 style="margin-top: 28px;">Top Talkers (Source IPs)</h3>
-                    <canvas id="topTalkersBar" height="140"></canvas>
-                    <h3 style="margin-top: 28px;">Traffic Over Time (per second)</h3>
-                    <canvas id="timeSeries" height="160"></canvas>
-                </section>
-            `;
-            // Insert charts after top talkers
-            document.getElementById('top-talkers').insertAdjacentHTML('afterend', chartsSection);
+            const statsEl = document.getElementById('stats');
+            statsEl.innerHTML = '';
+            const stats = [
+                { label: 'Total Packets', value: data.basic_stats.total_packets },
+                { label: 'Duration (s)', value: data.basic_stats.duration },
+                { label: 'Unique IPs', value: data.basic_stats.unique_ips },
+                { label: 'Total Size', value: data.basic_stats.total_bytes + ' bytes' },
+            ];
+            stats.forEach(s => {
+                const div = document.createElement('div');
+                div.className = 'stat';
+                div.innerHTML = `<div class="label">${s.label}</div><div class="value">${s.value}</div>`;
+                statsEl.appendChild(div);
+            });
 
-            // Draw Protocol Pie Chart
-            const protocolLabels = Object.keys(data.protocol_stats);
-            const protocolCounts = Object.values(data.protocol_stats);
-            new Chart(document.getElementById('protocolPie'), {
+            const protocolsTable = document.getElementById('protocols');
+            let protHtml = '<tr><th>Protocol</th><th>Count</th><th>Percentage</th></tr>';
+            const protocolStats = data.protocol_stats || {};
+            const totalPackets = data.basic_stats.total_packets || 0;
+            for (const [p, count] of Object.entries(protocolStats)) {
+                const pct = totalPackets ? ((count / totalPackets) * 100).toFixed(1) : '0.0';
+                protHtml += `<tr><td>${p}</td><td>${count}</td><td>${pct}%</td></tr>`;
+            }
+            protocolsTable.innerHTML = protHtml;
+
+            const talkersTable = document.getElementById('top-talkers');
+            let talkHtml = '<tr><th>IP</th><th>Packets</th></tr>';
+            (data.top_talkers || []).forEach(([ip, count]) => {
+                talkHtml += `<tr><td>${ip}</td><td>${count}</td></tr>`;
+            });
+            talkersTable.innerHTML = talkHtml;
+
+            const packetsTable = document.getElementById('packet-details');
+            let pkHtml = '<tr><th>#</th><th>Time</th><th>Src</th><th>Dst</th><th>Proto</th><th>Size</th></tr>';
+            (data.packet_details || []).slice(0, 10).forEach((p, i) => {
+                pkHtml += `<tr><td>${i + 1}</td><td>${p.time}</td><td>${p.source}</td><td>${p.destination}</td><td>${p.protocol}</td><td>${p.size}</td></tr>`;
+            });
+            packetsTable.innerHTML = pkHtml;
+
+            const protocolLabels = Object.keys(protocolStats);
+            const protocolCounts = Object.values(protocolStats);
+            const ctxP = document.getElementById('protocolPie').getContext('2d');
+            charts.push(new Chart(ctxP, {
                 type: 'pie',
                 data: {
                     labels: protocolLabels,
                     datasets: [{
                         data: protocolCounts,
-                        backgroundColor: [
-                            '#667eea', '#764ba2', '#28a745', '#ffce56', '#ff6384', '#36a2eb', '#fd7e14'
-                        ]
+                        backgroundColor: ['#667eea', '#764ba2', '#28a745', '#ffce56', '#ff6384', '#36a2eb', '#fd7e14']
                     }]
                 },
-                options: {
-                    responsive: true,
-                    plugins: { legend: { position: 'bottom' } }
-                }
-            });
+                options: { plugins: { legend: { position: 'bottom' } }, responsive: true }
+            }));
 
-            // Draw Top Talkers Bar Chart
-            const talkerLabels = data.top_talkers.map(([ip]) => ip);
-            const talkerCounts = data.top_talkers.map(([, count]) => count);
-            new Chart(document.getElementById('topTalkersBar'), {
+            const talkLabels = (data.top_talkers || []).map(t => t[0]);
+            const talkCounts = (data.top_talkers || []).map(t => t[1]);
+            const ctxB = document.getElementById('topTalkersBar').getContext('2d');
+            charts.push(new Chart(ctxB, {
                 type: 'bar',
-                data: {
-                    labels: talkerLabels,
-                    datasets: [{
-                        label: 'Packet Count',
-                        data: talkerCounts,
-                        backgroundColor: '#667eea'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    plugins: { legend: { display: false } },
-                    scales: { x: { title: { display: false } }, y: { beginAtZero: true } }
-                }
-            });
+                data: { labels: talkLabels, datasets: [{ label: 'Packets', data: talkCounts, backgroundColor: '#667eea' }] },
+                options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+            }));
 
-            // Draw Traffic Over Time Chart (if available)
-            if (data.traffic_over_time) {
-                const timeLabels = data.traffic_over_time.map(item => item.time);
-                const timeCounts = data.traffic_over_time.map(item => item.count);
-                new Chart(document.getElementById('timeSeries'), {
-                    type: 'line',
-                    data: {
-                        labels: timeLabels,
-                        datasets: [{
-                            label: 'Packets per Second',
-                            data: timeCounts,
-                            fill: true,
-                            borderColor: '#764ba2',
-                            backgroundColor: 'rgba(118,75,162,0.1)',
-                            tension: 0.3
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        plugins: { legend: { display: false } },
-                        scales: { x: { title: { display: false } }, y: { beginAtZero: true } }
-                    }
-                });
-            }
-
-            // Display first 10 packets
-            let packetsHtml = '<h3>First 10 Packets</h3><table><tr><th>#</th><th>Time</th><th>Source</th><th>Destination</th><th>Protocol</th><th>Size</th></tr>';
-            data.packet_details.forEach((packet, index) => {
-                packetsHtml += `<tr>
-                    <td>${index + 1}</td>
-                    <td>${packet.time}</td>
-                    <td>${packet.source}</td>
-                    <td>${packet.destination}</td>
-                    <td>${packet.protocol}</td>
-                    <td>${packet.size}</td>
-                </tr>`;
-            });
-            packetsHtml += '</table>';
-            document.getElementById('packet-details').innerHTML = packetsHtml;
-            
-            document.getElementById('results').style.display = 'block';
+            resultsEl.style.display = 'block';
+            emptyEl.style.display = 'none';
         }
     </script>
 </body>

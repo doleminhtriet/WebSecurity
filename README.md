@@ -10,6 +10,7 @@
 | Scan Phishing | `/phishing` | `public/phishing.html` | TF‑IDF + logistic regression classifier with optional URL features. |
 | Scan Malware | `/malware` | `public/malware.html` | Heuristic file scanner (entropy, strings, headers). Logs to Mongo. |
 | PCAP Analyzer | `/pcap` | `public/pcap.html` | Scapy-powered capture summary + SYN flood heuristic. |
+| Reporting | `/reporting` | `public/reporting.html` | Aggregates Mongo logs from phishing/malware/pcap and supports CSV export. |
 
 ## Prerequisites
 - Python 3.11+ (project built/tested on 3.13).
@@ -65,6 +66,13 @@ Open the UI at `http://127.0.0.1:8000/app/index.html`.
 - Endpoint `/pcap/analyze` returns stats + SYN flood findings.
 - Front-end upload page: `public/pcap.html`.
 - If Scapy is missing the API returns HTTP 503 with a descriptive message.
+
+### Reporting
+- Health: `/reporting/health` (checks Mongo connectivity + collection names).
+- Summary UI/API: `/reporting/summary?limit=5&from_ts=<iso>&to_ts=<iso>` returns counts + recent entries for phishing, malware, pcap analyses, and threats.
+- Export: `/reporting/export?kind=phishing|malware|pcap_analyses|pcap_threats&format=csv|json`.
+- Data source: pulls from Mongo collections defined in `config/base.yaml` (defaults: `predictions`, `malware`, `analyses`, `threats`).
+- Demo data: `python scripts/seed_reporting.py` seeds sample docs; add `--cleanup` to remove them.
 
 ## Configuration (`config/base.yaml`)
 - `mongodb` section toggles logging and TLS behaviour.

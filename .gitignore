@@ -8,7 +8,6 @@ venv/
 .vscode/
 data/
 checkpoints/
-*.joblib
 *.pkl
 .DS_Store
 Thumbs.db

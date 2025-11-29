@@ -49,6 +49,7 @@ Open the UI at `http://127.0.0.1:8000/app/index.html`.
   python -m modules.scan_phishing.cli predict --text "example email"
   ```
 - Mongo collection: `predictions` (configurable via `config/base.yaml`).
+- Note: `modules/scan_phishing/artifacts/` is gitignored. If you’re cloning fresh, either copy in the artifacts you trust or retrain with the CLI above to regenerate `vectorizer.joblib`/`model.joblib`.
 
 ### Malware Scanner
 - Heuristic engine in `modules/scan_malware/scanner.py`.

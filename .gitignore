@@ -11,5 +11,4 @@ checkpoints/
 *.pkl
 .DS_Store
 Thumbs.db
-.env
 .env.*

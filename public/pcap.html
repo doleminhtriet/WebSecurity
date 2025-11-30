@@ -345,6 +345,7 @@
         const loadingEl = document.getElementById('loading');
         const resultsEl = document.getElementById('results');
         const emptyEl = document.getElementById('empty-state');
+        const dropzone = document.getElementById('dropzone');
 
         let selectedFile = null;
 
@@ -370,6 +371,44 @@
         });
 
         analyzeBtn.addEventListener('click', analyzeFile);
+        dropzone.addEventListener('dragenter', handleDrag);
+        dropzone.addEventListener('dragover', handleDrag);
+        dropzone.addEventListener('dragleave', handleDragLeave);
+        dropzone.addEventListener('drop', handleDrop);
+        window.addEventListener('dragover', preventWindowDrop, false);
+        window.addEventListener('drop', preventWindowDrop, false);
+
+        function preventWindowDrop(e) {
+            e.preventDefault();
+        }
+
+        function handleDrag(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            dropzone.classList.add('dragging');
+        }
+
+        function handleDragLeave(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            dropzone.classList.remove('dragging');
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            dropzone.classList.remove('dragging');
+            const file = e.dataTransfer?.files?.[0];
+            if (!file) return;
+            const lower = file.name.toLowerCase();
+            if (!lower.endsWith('.pcap') && !lower.endsWith('.pcapng')) {
+                alert('Please drop a .pcap or .pcapng file.');
+                return;
+            }
+            selectedFile = file;
+            fileName.textContent = 'Selected: ' + file.name;
+            analyzeBtn.style.display = 'inline-block';
+        }
 
         async function analyzeFile() {
             if (!selectedFile) return;

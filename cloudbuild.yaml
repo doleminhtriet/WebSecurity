@@ -10,6 +10,7 @@ steps:
       - .
       - --env
       - GOOGLE_ENTRYPOINT=python -m uvicorn apps.api.main:app --host 0.0.0.0 --port 8080
+      - --publish
 
   # Deploy to Cloud Run after a successful build
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk

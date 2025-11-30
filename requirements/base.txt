@@ -16,5 +16,5 @@ beautifulsoup4
 lxml
 tldextract
 regex
-scapy
+scapy==2.5.0
 python-multipart

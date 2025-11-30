@@ -1,0 +1,31 @@
+steps:
+  # Build container image with Google Cloud Buildpacks
+  - name: gcr.io/k8s-skaffold/pack
+    entrypoint: pack
+    args:
+      - build
+      - gcr.io/$PROJECT_ID/websecurity
+      - --builder=gcr.io/buildpacks/builder:v1
+      - --path
+      - .
+      - --env
+      - GOOGLE_ENTRYPOINT=python -m uvicorn apps.api.main:app --host 0.0.0.0 --port 8080
+
+  # Deploy to Cloud Run after a successful build
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - websecurity
+      - --image
+      - gcr.io/$PROJECT_ID/websecurity
+      - --region
+      - europe-west1
+      - --platform
+      - managed
+      - --allow-unauthenticated
+      - --quiet
+
+images:
+  - gcr.io/$PROJECT_ID/websecurity

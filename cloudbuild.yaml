@@ -28,8 +28,5 @@ steps:
       - --allow-unauthenticated
       - --quiet
 
-images:
-  - gcr.io/$PROJECT_ID/websecurity
-
 options:
   logging: CLOUD_LOGGING_ONLY

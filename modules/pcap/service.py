@@ -26,7 +26,9 @@ try:  # pragma: no cover - optional dependency
 
     SCAPY_AVAILABLE = True
     PacketContainer = PacketList
-except ImportError as exc:  # pragma: no cover
+except Exception as exc:  # pragma: no cover
+    # Catch broad exceptions because Scapy may fail in minimal container
+    # environments (e.g., missing IPv6 route metadata) with non-Import errors.
     rdpcap = None  # type: ignore
     DNS = ICMP = IP = TCP = UDP = ARP = PacketContainer = None  # type: ignore
     SCAPY_AVAILABLE = False

@@ -18,7 +18,9 @@ from fastapi import APIRouter, File, HTTPException, UploadFile
 from modules.pcap.database import get_database
 
 try:  # pragma: no cover - optional dependency
-    from scapy.all import rdpcap  # type: ignore
+    # Import only the pieces we need to avoid Scapy auto-loading extra layers
+    # (netflow/IPv6) that can break in minimal containers.
+    from scapy.utils import rdpcap  # type: ignore
     from scapy.layers.dns import DNS  # type: ignore
     from scapy.layers.inet import ICMP, IP, TCP, UDP  # type: ignore
     from scapy.layers.l2 import ARP  # type: ignore
@@ -26,6 +28,7 @@ try:  # pragma: no cover - optional dependency
 
     SCAPY_AVAILABLE = True
     PacketContainer = PacketList
+    SCAPY_IMPORT_ERROR = None
 except Exception as exc:  # pragma: no cover
     # Catch broad exceptions because Scapy may fail in minimal container
     # environments (e.g., missing IPv6 route metadata) with non-Import errors.
@@ -37,6 +40,9 @@ except Exception as exc:  # pragma: no cover
 
 router = APIRouter(prefix="/pcap", tags=["pcap"])
 logger = logging.getLogger(__name__)
+
+if not SCAPY_AVAILABLE:
+    logger.warning("Scapy unavailable at import time: %s", SCAPY_IMPORT_ERROR)
 
 _db = get_database()
 _db_ready = False
@@ -103,8 +109,10 @@ async def analyze_pcap(file: UploadFile = File(...)) -> Dict[str, Any]:
     if not SCAPY_AVAILABLE:
         raise HTTPException(
             status_code=503,
-            detail="PCAP analysis unavailable: Scapy is not installed. "
-            "Install scapy in the virtual environment to enable this module.",
+            detail=(
+                "PCAP analysis unavailable: Scapy failed to load in this environment. "
+                f"{SCAPY_IMPORT_ERROR}"
+            ),
         )
 
     if not file.filename or not file.filename.lower().endswith((".pcap", ".pcapng")):

@@ -7,70 +7,80 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
-            --accent-1: #5b6ef1;
-            --accent-2: #6e52b8;
-            --muted: #6b7280;
-            --bg: #f4f6fb;
-            --card: #ffffff;
-            --success: #28a745;
-            --radius: 12px;
+            --bg:#0b1220;
+            --card:#111a2a;
+            --card2:#0f1627;
+            --text:#e6edf3;
+            --muted:#9fb1c7;
+            --accent:#4f8bff;
+            --accent2:#22d3ee;
+            --border:#1e2a44;
+            --success:#10b981;
+            --radius:12px;
         }
 
         html, body {
             height: 100%;
             margin: 0;
-            font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+            font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
         }
 
         body {
-            background: linear-gradient(180deg, var(--bg), #eef2ff 60%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 28px;
-            color: #111827;
+            background: radial-gradient(circle at 20% 20%, rgba(79,139,255,0.08), transparent 35%),
+                        radial-gradient(circle at 80% 10%, rgba(34,211,238,0.07), transparent 32%),
+                        var(--bg);
+            color: var(--text);
+            padding: 0 0 30px 0;
         }
 
         .wrap {
-            width: 100%;
-            max-width: 1100px;
-            background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), var(--card));
-            border-radius: var(--radius);
-            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+            max-width: 1160px;
+            margin: 0 auto;
             padding: 22px;
-            backdrop-filter: blur(6px);
         }
 
-        header {
+        header{
+            padding: 14px 0 18px 0;
             display: flex;
             gap: 16px;
             align-items: center;
-            margin-bottom: 18px;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            background: rgba(11,18,32,0.9);
+            backdrop-filter: blur(10px);
+            z-index: 2;
+        }
+
+        .title-block h1{
+            margin: 0;
+            font-size: 20px;
+        }
+        .title-block .lead{
+            margin: 4px 0 0 0;
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        nav{
+            display: flex;
+            align-items: center;
+            gap: 12px;
         }
 
         .logo {
             width: 52px;
             height: 52px;
             border-radius: 10px;
-            background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
             display: flex;
             align-items: center;
             justify-content: center;
             color: white;
             font-weight: 700;
-            box-shadow: 0 6px 18px rgba(99, 102, 241, 0.15);
+            box-shadow: 0 6px 18px rgba(79, 139, 255, 0.25);
             flex-shrink: 0;
-        }
-
-        h1 {
-            font-size: 20px;
-            margin: 0;
-        }
-
-        p.lead {
-            margin: 0;
-            color: var(--muted);
-            font-size: 13px;
         }
 
         .main {
@@ -81,31 +91,38 @@
         }
 
         .panel {
-            background: var(--card);
+            background: linear-gradient(160deg, var(--card), var(--card2));
+            border: 1px solid var(--border);
             border-radius: 10px;
             padding: 16px;
-            box-shadow: 0 6px 18px rgba(15, 23, 42, 0.03);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
         }
 
         .drop {
-            border: 1px dashed rgba(99, 102, 241, 0.18);
+            border: 1px dashed rgba(79, 139, 255, 0.3);
             padding: 18px;
             border-radius: 10px;
             text-align: center;
-            background: linear-gradient(180deg, rgba(99, 102, 241, 0.03), rgba(99, 102, 241, 0.01));
+            background: linear-gradient(180deg, rgba(79, 139, 255, 0.06), rgba(79, 139, 255, 0.02));
+            color: var(--muted);
+        }
+        .drop.dragging{
+            border-color: var(--accent2);
+            box-shadow: 0 0 0 1px rgba(79, 139, 255, 0.35);
+            background: linear-gradient(180deg, rgba(79, 139, 255, 0.12), rgba(79, 139, 255, 0.05));
         }
 
         .file-label {
             display: inline-block;
             padding: 10px 16px;
-            background: linear-gradient(90deg, var(--accent-1), var(--accent-2));
+            background: linear-gradient(90deg, var(--accent), var(--accent2));
             color: #fff;
             border-radius: 999px;
             cursor: pointer;
             margin-top: 12px;
             font-weight: 600;
             font-size: 14px;
-            box-shadow: 0 6px 14px rgba(99, 102, 241, 0.12);
+            box-shadow: 0 6px 14px rgba(79, 139, 255, 0.25);
         }
 
         #file-input {
@@ -133,19 +150,20 @@
             border: 0;
             cursor: pointer;
             font-weight: 600;
-            background: var(--accent-1);
+            background: linear-gradient(90deg, var(--accent), var(--accent2));
             color: #fff;
+            box-shadow: 0 6px 18px rgba(79, 139, 255, 0.25);
         }
 
         .btn.ghost {
             background: transparent;
-            color: var(--accent-2);
-            border: 1px solid rgba(101, 84, 199, 0.12);
+            color: var(--text);
+            border: 1px solid var(--border);
             font-weight: 600;
         }
 
-        .btn.success {
-            background: var(--success);
+        .btn.success{
+            background: linear-gradient(90deg, #16a34a, var(--success));
         }
 
         .loading {
@@ -162,7 +180,7 @@
             height: 20px;
             border-radius: 50%;
             border: 3px solid rgba(0, 0, 0, 0.06);
-            border-top-color: var(--accent-2);
+            border-top-color: var(--accent2);
             animation: spin 1s linear infinite;
         }
 
@@ -182,12 +200,12 @@
         }
 
         .stat {
-            background: var(--card);
+            background: linear-gradient(160deg, var(--card), var(--card2));
             padding: 12px;
             border-radius: 10px;
             min-width: 160px;
             flex: 1;
-            box-shadow: 0 6px 18px rgba(15, 23, 42, 0.03);
+            border: 1px solid var(--border);
         }
 
         .stat .label {
@@ -208,7 +226,7 @@
         h3 {
             margin: 0 0 10px 0;
             font-size: 15px;
-            color: #111827;
+            color: var(--text);
         }
 
         table {
@@ -220,8 +238,8 @@
         th, td {
             padding: 8px 6px;
             text-align: left;
-            border-bottom: 1px solid #eef2ff;
-            color: #374151;
+            border-bottom: 1px solid var(--border);
+            color: var(--text);
         }
 
         th {
@@ -235,6 +253,30 @@
             height: 160px !important;
             border-radius: 8px;
             background: transparent;
+        }
+
+        a{color:#7cc7ff;text-decoration:none;}
+        .muted{color:var(--muted);}
+        .lead{color:var(--muted);font-size:13px;margin:0;}
+        .pill{
+            display:inline-flex;
+            align-items:center;
+            gap:6px;
+            padding:6px 10px;
+            border-radius:999px;
+            font-size:12px;
+            border:1px solid var(--border);
+            color:var(--muted);
+        }
+
+        .logout-btn{
+            margin-left:8px;
+            background:#ef4444;
+            border:1px solid #b91c1c;
+            color:#fff;
+            padding:8px 12px;
+            border-radius:10px;
+            cursor:pointer;
         }
 
         @media (max-width: 920px) {
@@ -261,10 +303,17 @@
     </script>
     <div class="wrap" role="main">
         <header>
-            <div class="logo">PC</div>
-            <div>
-                <h1>PCAP Analyzer</h1>
+            <div style="display:flex;gap:12px;align-items:center;">
+                
+                <div class="title-block">
+                    <h1>PCAP Analyzer</h1>
+                    <p class="lead">Upload a PCAP to visualize traffic and top talkers.</p>
+                </div>
             </div>
+            <nav>
+                <a href="/app/index.html">Home</a>
+                <button id="logoutBtn" class="logout-btn" type="button">Logout</button>
+            </nav>
         </header>
 
         <div class="main">
@@ -338,6 +387,11 @@
 
     <script>
         let charts = [];
+        if(window.Chart){
+            Chart.defaults.color = "#cbd5e1";
+            Chart.defaults.borderColor = "rgba(255,255,255,0.08)";
+            Chart.defaults.font.family = '"Segoe UI", system-ui, sans-serif';
+        }
         const fileInput = document.getElementById('file-input');
         const fileName = document.getElementById('file-name');
         const analyzeBtn = document.getElementById('analyze-btn');
@@ -377,6 +431,13 @@
         dropzone.addEventListener('drop', handleDrop);
         window.addEventListener('dragover', preventWindowDrop, false);
         window.addEventListener('drop', preventWindowDrop, false);
+        const logoutBtn = document.getElementById('logoutBtn');
+        if(logoutBtn){
+            logoutBtn.onclick = ()=>{
+                localStorage.removeItem('authToken');
+                window.location.href = '/app/login/login.html';
+            };
+        }
 
         function preventWindowDrop(e) {
             e.preventDefault();

@@ -25,12 +25,31 @@
       try {
         const res = await fetch('/auth/login', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
           body: JSON.stringify(data)
         });
-        const j = await res.json();
-        if (!res.ok) throw new Error(j.detail || 'Login failed');
-        localStorage.setItem('authToken', j.token);
+        let payload = null;
+        let rawText = '';
+        try {
+          const ct = res.headers.get('content-type') || '';
+          if (ct.includes('application/json')) {
+            payload = await res.json();
+          } else {
+            rawText = await res.text();
+          }
+        } catch (parseErr) {
+          rawText = parseErr.message || '';
+        }
+
+        if (!res.ok) {
+          const detail = (payload && payload.detail) || rawText || `HTTP ${res.status}`;
+          throw new Error(detail);
+        }
+
+        localStorage.setItem('authToken', payload.token);
         window.location.href = '/app/index.html';
       } catch (err) {
         msg.textContent = err.message || 'Error';

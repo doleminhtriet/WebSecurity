@@ -76,6 +76,7 @@ _cfg, _pcfg, _pipe, _db = _load_everything()
 # -------------------------
 # Helpers
 # -------------------------
+# Normalize subject/body/raw into a single text string for scoring.
 def _combine_text(subject: Optional[str], body: Optional[str], raw: Optional[str]) -> str:
     """Prefer raw if provided; otherwise stitch subject + body."""
     if raw:
@@ -85,6 +86,7 @@ def _combine_text(subject: Optional[str], body: Optional[str], raw: Optional[str
     return f"subject: {subject}\n\n{body}"
 
 
+# Optionally log a prediction to Mongo, honoring logging config.
 def _mongo_log_prediction(
     text: str,
     email_in: EmailIn,
@@ -130,6 +132,7 @@ def _mongo_log_prediction(
         logger.debug("Mongo disabled or URI missing (_db is None) — skipping log.")
 
 
+# Extract subject/body from .eml upload payloads.
 def _parse_eml_bytes(data: bytes) -> Tuple[str, str]:
     """
     Parse a .eml payload and return (subject, body) as strings.
@@ -174,6 +177,7 @@ def _parse_eml_bytes(data: bytes) -> Tuple[str, str]:
 # -------------------------
 # Endpoints
 # -------------------------
+# Health probe for model+Mongo state.
 @router.get("/health")
 def health() -> Dict[str, Any]:
     """Quick health summary."""
@@ -187,6 +191,7 @@ def health() -> Dict[str, Any]:
     }
 
 
+# Reload config/artifacts/DB without restarting the process.
 @router.post("/reload")
 def reload_runtime() -> Dict[str, Any]:
     """
@@ -226,6 +231,7 @@ def reload_runtime() -> Dict[str, Any]:
     }
 
 
+# Predict from JSON payload (subject/body/raw).
 @router.post("/predict", response_model=PredictOut)
 def predict(email_in: EmailIn) -> PredictOut:
     """
@@ -245,6 +251,7 @@ def predict(email_in: EmailIn) -> PredictOut:
     return PredictOut(label=label, probability=prob)
 
 
+# Predict from uploaded .eml file.
 @router.post("/upload", response_model=PredictOut)
 async def predict_eml(file: UploadFile = File(...)) -> PredictOut:
     """

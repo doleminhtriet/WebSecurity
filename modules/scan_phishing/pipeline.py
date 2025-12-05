@@ -10,17 +10,20 @@ import numpy as np
 
 from .features import build_featurizer
 
+# Read CSV and return text + label arrays.
 def _read(csv_path, text_col, label_col):
     df = pd.read_csv(csv_path)
     if text_col not in df.columns or label_col not in df.columns:
         raise ValueError(f"{csv_path} must have columns '{text_col}' and '{label_col}'")
     return df[text_col].astype(str).fillna(""), df[label_col].astype(int).to_numpy()
 
+# Persist vectorizer and classifier to disk.
 def save_artifacts(vec, clf, artifacts_dir: str):
     d = Path(artifacts_dir); d.mkdir(parents=True, exist_ok=True)
     dump(vec, d / "vectorizer.joblib")
     dump(clf, d / "model.joblib")
 
+# Load vectorizer and classifier from disk (runtime use).
 def load_artifacts(artifacts_dir: str):
     d = Path(artifacts_dir)
     featurizer = load(d / "vectorizer.joblib")
@@ -36,6 +39,7 @@ def load_artifacts(artifacts_dir: str):
         "clf": clf,
     }
 
+# Train the phishing model, evaluate on validation, and write artifacts/metrics.
 def train(cfg):
     pcfg, dcfg = cfg["phishing"], cfg["phishing"]["data"]
     artifacts = Path(pcfg.get("artifacts_dir", "modules/scan_phishing/artifacts"))
@@ -97,6 +101,7 @@ def train(cfg):
     (artifacts / "metrics.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")
     return metrics
 
+# Load saved artifacts and report validation metrics.
 def evaluate(cfg):
     pcfg, dcfg = cfg["phishing"], cfg["phishing"]["data"]
     artifacts = Path(pcfg.get("artifacts_dir", "modules/scan_phishing/artifacts"))

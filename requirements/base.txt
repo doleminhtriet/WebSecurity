@@ -18,3 +18,4 @@ tldextract
 regex
 scapy==2.5.0
 python-multipart
+clamd

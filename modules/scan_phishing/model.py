@@ -1,8 +1,14 @@
+"""
+Model factory + artifact I/O for the phishing classifier.
+Builds a TF-IDF+URL featurizer and logistic regression, then saves/loads
+their joblib artifacts for runtime use.
+"""
 from typing import Dict, Any
 from sklearn.linear_model import LogisticRegression
 from joblib import dump, load
 from .features import TextURLFeaturizer
 
+# Build featurizer + classifier from config.
 def build_model(cfg: Dict[str, Any]):
     pcfg = cfg["phishing"]
     fcfg = pcfg["features"]
@@ -28,16 +34,19 @@ def build_model(cfg: Dict[str, Any]):
     )
     return {"featurizer": featurizer, "clf": clf}
 
+# Persist model artifacts to disk.
 def save_artifacts(pipe, artifacts_dir: str):
     dump(pipe["featurizer"], f"{artifacts_dir}/vectorizer.joblib")
     dump(pipe["clf"], f"{artifacts_dir}/model.joblib")
 
+# Load model artifacts from disk.
 def load_artifacts(artifacts_dir: str):
     featurizer = load(f"{artifacts_dir}/vectorizer.joblib")
     clf = load(f"{artifacts_dir}/model.joblib")
     expected = getattr(clf, "n_features_in_", None)
     if expected is not None and hasattr(featurizer, "__setattr__"):
         try:
+            # Keep vectorizer and classifier in sync when sklearn tracks feature count.
             featurizer.expected_total_features = expected
         except Exception:
             pass

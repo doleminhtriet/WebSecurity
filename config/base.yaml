@@ -35,7 +35,14 @@ phishing:
     store_text: true
 
 malware:
+  engine: clamav  # options: clamav, heuristic
   threshold: 0.6
+  clamav:
+    host: localhost
+    port: 3310
+    unix_socket: null  # set to a socket path to prefer UNIX socket
+    timeout: 30
+  # Heuristic scanner settings (fallback if engine=heuristic)
   scanner:
     max_bytes: 20971520  # 20 MB
     high_entropy_threshold: 7.2

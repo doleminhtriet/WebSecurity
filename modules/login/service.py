@@ -23,6 +23,7 @@ import bcrypt
 import jwt
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from pymongo.errors import InvalidOperation
 
 from core.config import load_config
 from core.db.mongodb import get_db
@@ -102,7 +103,15 @@ def _get_current_user(creds: Optional[HTTPAuthorizationCredentials] = Depends(se
     col = _users_col()
     if col is None:
         raise HTTPException(status_code=503, detail="Auth database unavailable")
-    user = col.find_one({"email": email})
+    try:
+        user = col.find_one({"email": email})
+    except InvalidOperation:
+        # Mongo client was closed; reload and retry once
+        _load_db()
+        col = _users_col()
+        if col is None:
+            raise HTTPException(status_code=503, detail="Auth database unavailable")
+        user = col.find_one({"email": email})
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
     user["_id"] = str(user["_id"])
@@ -147,7 +156,14 @@ def login(payload: Dict[str, str]) -> Dict[str, Any]:
     if not email or not password:
         raise HTTPException(status_code=400, detail="Email and password are required")
 
-    user = col.find_one({"email": email})
+    try:
+        user = col.find_one({"email": email})
+    except InvalidOperation:
+        _load_db()
+        col = _users_col()
+        if col is None:
+            raise HTTPException(status_code=503, detail="Auth database unavailable")
+        user = col.find_one({"email": email})
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 

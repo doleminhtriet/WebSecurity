@@ -41,13 +41,14 @@ except Exception as exc:  # pragma: no cover
 router = APIRouter(prefix="/pcap", tags=["pcap"])
 logger = logging.getLogger(__name__)
 
+# Log a warning at import time if Scapy is unavailable
 if not SCAPY_AVAILABLE:
     logger.warning("Scapy unavailable at import time: %s", SCAPY_IMPORT_ERROR)
 
 _db = get_database()
 _db_ready = False
 
-
+# Basic health check endpoint
 @router.get("/health")
 def health() -> Dict[str, Any]:
     """Basic readiness probe for the PCAP module."""
@@ -58,38 +59,44 @@ def health() -> Dict[str, Any]:
         "timestamp": datetime.utcnow().isoformat() + "Z",
     }
 
-
+# Ensure MongoDB connection and indexes
 async def _ensure_db_ready() -> bool:
     """Connect to Mongo (if configured) and ensure indexes exist."""
     global _db_ready
     if _db is None or _db_ready:
         return _db_ready
+    # Attempt to connect and initialize indexes
     try:
         ok = await _db.connect()
         if not ok:
             return False
         await _db.initialize_indexes()
         _db_ready = True
+     # Catch broad exceptions to avoid breaking PCAP analysis if Mongo is misconfigured
     except Exception:
         logger.exception("Mongo logging unavailable for PCAP module")
         return False
     return _db_ready
 
-
+# Log analysis results to MongoDB
 async def _log_analysis(filename: str, analysis: Dict[str, Any]) -> None:
     """Persist analysis and threat findings if Mongo is available."""
     if not await _ensure_db_ready():
         return
 
+    # Attempt to save analysis and threat data
     try:
         await _db.save_analysis(filename, analysis)
 
+        # Summarize SYN flood findings
         syn_flood = (analysis.get("detections", {}) or {}).get("syn_flood", []) or []
         threat_level = "High" if any(alert.get("severity") == "high" for alert in syn_flood) else ("Medium" if syn_flood else "Low")
         threat_summary = {
             "overall_threat_level": threat_level,
             "syn_flood_alerts": len(syn_flood),
         }
+
+        # Save threat summary
         await _db.save_threats(
             filename,
             {
@@ -100,7 +107,7 @@ async def _log_analysis(filename: str, analysis: Dict[str, Any]) -> None:
     except Exception:
         logger.exception("Failed to log PCAP analysis to Mongo")
 
-
+# PCAP analysis endpoint
 @router.post("/analyze")
 async def analyze_pcap(file: UploadFile = File(...)) -> Dict[str, Any]:
     """
@@ -115,16 +122,19 @@ async def analyze_pcap(file: UploadFile = File(...)) -> Dict[str, Any]:
             ),
         )
 
+    # Validate file type
     if not file.filename or not file.filename.lower().endswith((".pcap", ".pcapng")):
         raise HTTPException(
             status_code=400,
             detail="Invalid file type. Please upload a .pcap or .pcapng file.",
         )
 
+    # Save upload to a temporary file
     tmp_path: str | None = None
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pcap") as tmp_file:
             chunk_size = 8192
+            # Read and write in chunks to handle large files
             while True:
                 chunk = await file.read(chunk_size)
                 if not chunk:
@@ -132,6 +142,7 @@ async def analyze_pcap(file: UploadFile = File(...)) -> Dict[str, Any]:
                 tmp_file.write(chunk)
             tmp_path = tmp_file.name
 
+        # Read packets with Scapy
         packets = rdpcap(tmp_path)
         analysis = analyze_packets(packets)
         analysis["file"] = {
@@ -151,7 +162,7 @@ async def analyze_pcap(file: UploadFile = File(...)) -> Dict[str, Any]:
         if tmp_path and os.path.exists(tmp_path):
             os.remove(tmp_path)
 
-
+# Simple SYN flood detection heuristic
 def detect_syn_flood(packets: "PacketContainer") -> List[Dict[str, Any]]:
     """
     Very simple heuristic to highlight sources that send many SYN packets without ACKs.
@@ -160,6 +171,7 @@ def detect_syn_flood(packets: "PacketContainer") -> List[Dict[str, Any]]:
     syn_packets: defaultdict[str, List[Dict[str, Any]]] = defaultdict(list)
     syn_ack_counts: defaultdict[str, int] = defaultdict(int)
 
+    # Analyze packets for SYN and SYN-ACK counts
     for packet in packets:
         if packet.haslayer(TCP) and packet.haslayer(IP):
             flags = packet[TCP].flags
@@ -176,7 +188,9 @@ def detect_syn_flood(packets: "PacketContainer") -> List[Dict[str, Any]]:
                 dst_ip = packet[IP].dst
                 syn_ack_counts[dst_ip] += 1
 
+    # Identify potential SYN flood sources
     alerts: List[Dict[str, Any]] = []
+    # Evaluate each source IP's SYN to SYN-ACK ratio
     for src_ip, entries in syn_packets.items():
         syn_count = len(entries)
         syn_ack_count = syn_ack_counts.get(src_ip, 0)
@@ -184,9 +198,11 @@ def detect_syn_flood(packets: "PacketContainer") -> List[Dict[str, Any]]:
         if syn_count == 0:
             continue
 
+        # Calculate ratio of SYN-ACKs to SYNs
         ratio = syn_ack_count / syn_count if syn_count else 0.0
         if syn_count >= 10 and ratio < 0.2:
             unique_targets = {f"{e['dst_ip']}:{e['dst_port']}" for e in entries}
+            # Flag as suspicious if many SYNs with few SYN-ACKs
             alerts.append(
                 {
                     "source_ip": src_ip,
@@ -199,7 +215,7 @@ def detect_syn_flood(packets: "PacketContainer") -> List[Dict[str, Any]]:
             )
     return alerts
 
-
+# Analyze packets and compute statistics
 def analyze_packets(packets: "PacketContainer") -> Dict[str, Any]:
     """Compute aggregate statistics for a packet capture."""
     total_packets = len(packets)
@@ -216,18 +232,22 @@ def analyze_packets(packets: "PacketContainer") -> Dict[str, Any]:
             "packet_details": [],
         }
 
+    # Compute capture duration
     start_time = float(packets[0].time)
     end_time = float(packets[-1].time)
     duration = round(end_time - start_time, 2)
 
+    # Initialize counters
     protocol_counter: Counter[str] = Counter()
     source_counts: Counter[str] = Counter()
     dest_counts: Counter[str] = Counter()
     total_bytes = 0
 
+    # Iterate through packets to gather statistics
     for packet in packets:
         total_bytes += len(packet)
 
+        # Identify protocol
         if packet.haslayer(TCP):
             protocol_counter["TCP"] += 1
         elif packet.haslayer(UDP):
@@ -245,12 +265,14 @@ def analyze_packets(packets: "PacketContainer") -> Dict[str, Any]:
             source_counts[packet[IP].src] += 1
             dest_counts[packet[IP].dst] += 1
 
+    # Identify unique IPs and top talkers
     all_ips = set(source_counts) | set(dest_counts)
     top_talkers = [
         [ip, count]
         for ip, count in source_counts.most_common(5)
     ]
 
+    # Prepare packet details (first 10 packets)
     packet_details: List[Dict[str, Any]] = []
     for packet in packets[:10]:
         rel_time = round(float(packet.time) - start_time, 3)
@@ -266,6 +288,7 @@ def analyze_packets(packets: "PacketContainer") -> Dict[str, Any]:
             }
         )
 
+    # Compile final analysis results
     return {
         "basic_stats": {
             "total_packets": total_packets,
@@ -278,9 +301,11 @@ def analyze_packets(packets: "PacketContainer") -> Dict[str, Any]:
         "packet_details": packet_details,
     }
 
-
+# Identify protocol or application from packet
 def get_protocol_name(packet) -> str:
     """Identify a packet's protocol or high-level application."""
+
+    # Check for TCP-based protocols
     if packet.haslayer(TCP):
         sport = int(packet[TCP].sport)
         dport = int(packet[TCP].dport)
@@ -291,6 +316,8 @@ def get_protocol_name(packet) -> str:
         if 22 in (sport, dport):
             return "SSH"
         return "TCP"
+    
+    # Check for UDP-based protocols
     if packet.haslayer(UDP):
         sport = int(packet[UDP].sport)
         dport = int(packet[UDP].dport)

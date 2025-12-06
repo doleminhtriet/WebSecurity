@@ -24,6 +24,11 @@
     pre{background:#0e1729;border:1px solid #203156;border-radius:10px;padding:12px;overflow:auto}
     .alert{display:none;margin-top:10px;padding:10px 14px;border-radius:12px;background:#facc15;color:#1f2937;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,.2)}
     .logout-btn{margin-left:12px;background:#ef4444;border:1px solid #b91c1c;color:#fff;padding:8px 12px;border-radius:10px;cursor:pointer}
+    .meter-wrap{margin-top:6px}
+    .meter-bar{position:relative;height:8px;border-radius:999px;background:#0e1729;border:1px solid #203156;overflow:hidden}
+    .meter-fill{position:absolute;top:0;left:0;height:100%;background:#ef4444;transition:width .2s ease}
+    .meter-threshold{position:absolute;top:-3px;width:2px;height:14px;background:#facc15;right:0}
+    .meter-label{display:flex;justify-content:space-between;font-size:12px;color:#9fb1c7;margin-top:2px}
   </style>
   </style>
 </head>
@@ -58,6 +63,13 @@
           <span id="scanResult"></span>
         </div>
         <div id="scanDebug" style="color:#9fb1c7;margin-top:6px"></div>
+        <div class="meter-wrap">
+          <div class="meter-bar">
+            <div id="scanMeter" class="meter-fill" style="width:0%"></div>
+            <div class="meter-threshold" title="threshold"></div>
+          </div>
+          <div class="meter-label"><span>0%</span><span id="scanMeterVal">0%</span><span>100%</span></div>
+        </div>
         <div id="scanWarning" class="alert" role="alert"></div>
       </section>
 
@@ -69,6 +81,13 @@
           <span id="uploadResult"></span>
         </div>
         <div id="uploadDebug" style="color:#9fb1c7;margin-top:6px"></div>
+        <div class="meter-wrap">
+          <div class="meter-bar">
+            <div id="uploadMeter" class="meter-fill" style="width:0%"></div>
+            <div class="meter-threshold" title="threshold"></div>
+          </div>
+          <div class="meter-label"><span>0%</span><span id="uploadMeterVal">0%</span><span>100%</span></div>
+        </div>
         <div id="uploadWarning" class="alert" role="alert"></div>
       </section>
     </div>
@@ -84,12 +103,22 @@
     const healthBox = $("healthBox"), reloadBtn = $("reloadBtn");
     const subj = $("subj"), body = $("body"), scanBtn = $("scanBtn"), scanResult = $("scanResult"), scanDebug = $("scanDebug"), scanWarning = $("scanWarning");
     const emlFile = $("emlFile"), uploadBtn = $("uploadBtn"), uploadResult = $("uploadResult"), uploadDebug = $("uploadDebug"), uploadWarning = $("uploadWarning");
+    const scanMeter = $("scanMeter"), scanMeterVal = $("scanMeterVal");
+    const uploadMeter = $("uploadMeter"), uploadMeterVal = $("uploadMeterVal");
     const lastResponse = $("lastResponse");
+    let cachedThreshold = 0.5;
 
     function showResult(el, label, prob){
       const phishProb = (prob || 0);
       const p = (phishProb*100).toFixed(2)+"%";
       el.innerHTML = `<span class="pill ${label? 'bad':'ok'}">${label? 'PHISHING':'LEGIT'} • ${p}</span>`;
+    }
+    function updateMeter(meterEl, labelEl, prob){
+      if(!meterEl || !labelEl) return;
+      const pct = Math.max(0, Math.min(100, (prob||0)*100));
+      meterEl.style.width = `${pct}%`;
+      meterEl.style.background = prob >= cachedThreshold ? "#ef4444" : "#10b981";
+      labelEl.textContent = pct.toFixed(2)+"%";
     }
     function toggleWarning(box, label, prob){
       if(label){
@@ -108,6 +137,7 @@
       try{
         const r = await fetch("/phishing/health");
         const j = await r.json();
+        cachedThreshold = parseFloat(j.threshold || 0.5);
         const mongo = j.mongodb_connected ? '<span class="pill ok">Mongo connected</span>' : '<span class="pill bad">Mongo off</span>';
         const model = j.model_loaded ? '<span class="pill ok">Model loaded</span>' : '<span class="pill bad">Model missing</span>';
         healthBox.innerHTML = `${model} ${mongo} &nbsp; <span style="color:#9fb1c7">collection:</span> ${j.collection || '—'} &nbsp; <span style="color:#9fb1c7">threshold:</span> ${j.threshold}`;
@@ -122,6 +152,7 @@
         const r = await fetch("/phishing/predict", { method:"POST", headers: { "Content-Type":"application/json" }, body: JSON.stringify(payload) });
         const j = await r.json();
         showResult(scanResult, j.label, j.probability);
+        updateMeter(scanMeter, scanMeterVal, j.probability);
         scanDebug.textContent = "Logged server-side if Mongo is enabled.";
         toggleWarning(scanWarning, j.label, j.probability);
         setLast(j);
@@ -138,6 +169,7 @@
         const r = await fetch("/phishing/upload", { method:"POST", body: form });
         const j = await r.json();
         showResult(uploadResult, j.label, j.probability);
+        updateMeter(uploadMeter, uploadMeterVal, j.probability);
         uploadDebug.textContent = "Logged server-side if Mongo is enabled.";
         toggleWarning(uploadWarning, j.label, j.probability);
         setLast(j);

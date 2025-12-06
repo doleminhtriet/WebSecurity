@@ -12,6 +12,7 @@ from .features import build_featurizer
 
 # Read CSV and return text + label arrays.
 def _read(csv_path, text_col, label_col):
+    """Load CSV and return text/label arrays with required columns enforced."""
     df = pd.read_csv(csv_path)
     if text_col not in df.columns or label_col not in df.columns:
         raise ValueError(f"{csv_path} must have columns '{text_col}' and '{label_col}'")
@@ -19,12 +20,14 @@ def _read(csv_path, text_col, label_col):
 
 # Persist vectorizer and classifier to disk.
 def save_artifacts(vec, clf, artifacts_dir: str):
+    """Save fitted vectorizer and classifier to joblib files."""
     d = Path(artifacts_dir); d.mkdir(parents=True, exist_ok=True)
     dump(vec, d / "vectorizer.joblib")
     dump(clf, d / "model.joblib")
 
 # Load vectorizer and classifier from disk (runtime use).
 def load_artifacts(artifacts_dir: str):
+    """Load vectorizer + classifier artifacts; align feature count if present."""
     d = Path(artifacts_dir)
     featurizer = load(d / "vectorizer.joblib")
     clf = load(d / "model.joblib")
@@ -41,6 +44,7 @@ def load_artifacts(artifacts_dir: str):
 
 # Train the phishing model, evaluate on validation, and write artifacts/metrics.
 def train(cfg):
+    """Train phishing model, evaluate on validation, and write artifacts/metrics."""
     pcfg, dcfg = cfg["phishing"], cfg["phishing"]["data"]
     artifacts = Path(pcfg.get("artifacts_dir", "modules/scan_phishing/artifacts"))
     artifacts.mkdir(parents=True, exist_ok=True)
@@ -103,6 +107,7 @@ def train(cfg):
 
 # Load saved artifacts and report validation metrics.
 def evaluate(cfg):
+    """Reload artifacts and run validation metrics on the holdout split."""
     pcfg, dcfg = cfg["phishing"], cfg["phishing"]["data"]
     artifacts = Path(pcfg.get("artifacts_dir", "modules/scan_phishing/artifacts"))
     vec = load(artifacts / "vectorizer.joblib")
@@ -119,6 +124,7 @@ def evaluate(cfg):
             return hstack([X_tfidf, X_url], format="csr")
         return X_tfidf
 
+    # 
     Xva = transform(Xva_text)
     prob = clf.predict_proba(Xva)[:,1]
     thr = float(pcfg.get("threshold", 0.5))

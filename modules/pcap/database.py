@@ -8,18 +8,22 @@ import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+# Attempt to import Motor for async MongoDB operations
 try:
     from motor.motor_asyncio import AsyncIOMotorClient
+
+# pragma: no cover - optional dependency
 except Exception as exc:  # pragma: no cover - optional dependency
     AsyncIOMotorClient = None  # type: ignore
     MOTOR_IMPORT_ERROR = exc
-else:
+else: # pragma: no cover
     MOTOR_IMPORT_ERROR = None
 
-
+# MongoDB handler class
 class Database:
     """MongoDB handler for PCAP analysis results."""
 
+    # Initialize the database connection
     def __init__(self, uri: Optional[str] = None, db_name: Optional[str] = None):
         # Prefer environment variables; fall back to provided defaults.
         self.mongo_uri = uri if uri is not None else os.getenv("MONGODB_URI", "")
@@ -32,16 +36,20 @@ class Database:
         self.threats_collection = None
         self._indexes_ready = False
 
+    # Connect to MongoDB
     async def connect(self) -> bool:
         """Establish connection to MongoDB."""
+        # Check if Motor is available
         if AsyncIOMotorClient is None:
             print(f"[WARN] Motor not installed; skipping Mongo logging ({MOTOR_IMPORT_ERROR})")
             return False
 
+        # Check if URI is set
         if not self.mongo_uri:
             print("[INFO] MongoDB URI not set; skipping Mongo logging")
             return False
 
+        # Attempt to connect
         try:
             if self.client is None:
                 self.client = AsyncIOMotorClient(self.mongo_uri, serverSelectionTimeoutMS=5000)
@@ -51,11 +59,13 @@ class Database:
 
             await self.client.admin.command("ping")
             return True
+        # pylint: disable=broad-except
         except Exception as e:  # pragma: no cover - external dependency
             print(f"[ERROR] MongoDB connection failed: {e}")
             print("  Make sure MongoDB is running and MONGODB_URI is correct.")
             return False
 
+    # Initialize indexes
     async def initialize_indexes(self) -> None:
         """Create indexes for better query performance."""
         if self.analyses_collection is None or self.threats_collection is None:
@@ -72,6 +82,7 @@ class Database:
         except Exception as e:  # pragma: no cover - external dependency
             print(f"Warning: Could not create indexes: {e}")
 
+    # Save analysis results
     async def save_analysis(self, filename: str, analysis_data: Dict[str, Any]) -> str:
         """Save PCAP analysis results to database."""
         if self.analyses_collection is None:
@@ -90,6 +101,7 @@ class Database:
         print(f"[OK] Analysis saved with ID: {result.inserted_id}")
         return str(result.inserted_id)
 
+    # Save threat analysis
     async def save_threats(self, filename: str, threat_data: Dict[str, Any]) -> str:
         """Save security threat analysis to database."""
         if self.threats_collection is None:
@@ -109,6 +121,7 @@ class Database:
         print(f"[OK] Threats saved with ID: {result.inserted_id}")
         return str(result.inserted_id)
 
+    # Retrieve recent analyses
     async def get_recent_analyses(self, limit: int = 10) -> List[Dict[str, Any]]:
         """Retrieve recent analysis results."""
         if self.analyses_collection is None:
@@ -119,6 +132,7 @@ class Database:
             analysis["_id"] = str(analysis["_id"])
         return analyses
 
+    # Retrieve recent threats
     async def get_recent_threats(self, limit: int = 10) -> List[Dict[str, Any]]:
         """Retrieve recent threat detections."""
         if self.threats_collection is None:
@@ -129,6 +143,7 @@ class Database:
             threat["_id"] = str(threat["_id"])
         return threats
 
+    # Retrieve high-severity threats
     async def get_high_threats(self) -> List[Dict[str, Any]]:
         """Get all high-severity threats."""
         if self.threats_collection is None:
@@ -139,6 +154,7 @@ class Database:
             threat["_id"] = str(threat["_id"])
         return threats
 
+    # Retrieve analysis by filename
     async def get_analysis_by_filename(self, filename: str) -> Optional[Dict[str, Any]]:
         """Retrieve analysis by filename."""
         if self.analyses_collection is None:
@@ -148,6 +164,7 @@ class Database:
             analysis["_id"] = str(analysis["_id"])
         return analysis
 
+    # Get database statistics
     async def get_stats(self) -> Dict[str, Any]:
         """Get database statistics."""
         if self.analyses_collection is None or self.threats_collection is None:
@@ -162,6 +179,7 @@ class Database:
             "high_severity_threats": high_threats,
         }
 
+    # Close the MongoDB connection
     async def close(self) -> None:
         """Close MongoDB connection."""
         if self.client:
@@ -171,7 +189,7 @@ class Database:
 
 _db_instance: Optional[Database] = None
 
-
+# Singleton pattern for database instance
 def get_database() -> Database:
     """Get the singleton database instance."""
     global _db_instance

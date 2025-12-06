@@ -98,20 +98,27 @@ def _mongo_log_prediction(
     Insert a prediction record into Mongo if configured.
     Does nothing if _db is None or logging is disabled in config.
     """
+    # Only log according to config
     if _db is not None:
         mcfg = _cfg.get("phishing", {}).get("logging", {})
         only_pos = bool(mcfg.get("log_only_positives", True))
         do_log = (label == 1) if only_pos else True
+
+        # Skip logging if only positives and label=0
         if not do_log:
             logger.debug("Skipping log (log_only_positives=True and label=0).")
             return
 
         col_name = mcfg.get("collection_predictions", "phishing_predictions")
+
+        # Build document
         try:
             snippet = (
                 text if mcfg.get("store_text", False)
                 else (text[: int(mcfg.get("store_snippet_chars", 160))] if text else "")
             )
+
+            # Insert into Mongo
             doc = {
                 "ts": datetime.now(timezone.utc),
                 "label": label,
@@ -124,6 +131,8 @@ def _mongo_log_prediction(
                 "snippet": snippet,
                 "source": source,
             }
+
+            # Insert document
             _db[col_name].insert_one(doc)
             logger.info("Logged prediction to Mongo: %s.%s", _cfg["mongodb"]["database"], col_name)
         except Exception as e:
@@ -139,6 +148,7 @@ def _parse_eml_bytes(data: bytes) -> Tuple[str, str]:
     Prefers text/plain, falls back to text/html, otherwise empty.
     Raises HTTPException(400) for invalid EML.
     """
+    # Parse email
     try:
         msg = email.message_from_bytes(data, policy=policy.default)
     except Exception as e:
@@ -147,24 +157,35 @@ def _parse_eml_bytes(data: bytes) -> Tuple[str, str]:
     subject = msg.get("subject") or ""
     body_text, html_text = "", ""
 
+    # Extract body parts
     if msg.is_multipart():
+
+        # Walk parts to find text/plain and text/html
         for part in msg.walk():
             ctype = part.get_content_type()
+
+            # Prefer text/plain
             if ctype == "text/plain" and not body_text:
                 try:
                     body_text = part.get_content()
                 except Exception:
                     pass
+            #   Fallback to text/html    
             elif ctype == "text/html" and not html_text:
                 try:
                     html_text = part.get_content()
                 except Exception:
                     pass
+
+    # Non-multipart message            
     else:
         ctype = msg.get_content_type()
         try:
+            # Prefer text/plain
             if ctype == "text/plain":
                 body_text = msg.get_content()
+
+            #  Fallback to text/html    
             elif ctype == "text/html":
                 html_text = msg.get_content()
         except Exception:

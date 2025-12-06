@@ -173,13 +173,17 @@ def export(
     import csv
     import io
 
+    # Handle empty result set
     if not rows:
         return {"kind": kind, "count": 0, "data": ""}
 
+    # Determine all fieldnames across rows
     fieldnames = sorted({k for row in rows for k in row.keys()})
     buf = io.StringIO()
     writer = csv.DictWriter(buf, fieldnames=fieldnames)
     writer.writeheader()
+    
+    # Write rows
     for row in rows:
         writer.writerow(row)
     return buf.getvalue()

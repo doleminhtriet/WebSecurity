@@ -32,11 +32,15 @@ if str(ROOT) not in sys.path:
 from core.config import load_config
 from core.db.mongodb import get_db, reset_db
 
-
+# pylint: disable=import-error, wrong-import-position
 def load_phish_samples(path: Path, count: int, now: datetime) -> List[Dict[str, Any]]:
     rows: List[Dict[str, Any]] = []
+
+    # If the file doesn't exist, return empty list
     if not path.exists():
         return rows
+    
+    # Read CSV and build sample documents
     with path.open(newline="", encoding="utf-8", errors="ignore") as f:
         reader = csv.DictReader(f)
         for idx, row in enumerate(reader):
@@ -46,6 +50,7 @@ def load_phish_samples(path: Path, count: int, now: datetime) -> List[Dict[str, 
             label = int(row.get("label") or 0)
             ts = now - timedelta(hours=idx + 1)
             rows.append(
+                # Build document
                 {
                     "ts": ts,
                     "label": label,
@@ -59,7 +64,8 @@ def load_phish_samples(path: Path, count: int, now: datetime) -> List[Dict[str, 
             )
     return rows
 
-
+# pylint: disable=import-error, wrong-import-position
+# pylint: disable=too-many-locals
 def malware_samples(count: int, now: datetime) -> List[Dict[str, Any]]:
     base = [
         {
@@ -69,6 +75,8 @@ def malware_samples(count: int, now: datetime) -> List[Dict[str, Any]]:
             "label": 1,
             "indicators": ["high_entropy", "suspicious_strings"],
         },
+
+        # Second sample
         {
             "filename": "installer.msi",
             "sha256": hashlib.sha256(b"installer.msi").hexdigest(),
@@ -76,6 +84,8 @@ def malware_samples(count: int, now: datetime) -> List[Dict[str, Any]]:
             "label": 0,
             "indicators": ["low_entropy"],
         },
+
+        # Third sample
         {
             "filename": "script.ps1",
             "sha256": hashlib.sha256(b"script.ps1").hexdigest(),
@@ -85,6 +95,8 @@ def malware_samples(count: int, now: datetime) -> List[Dict[str, Any]]:
         },
     ]
     docs: List[Dict[str, Any]] = []
+
+    # Build documents
     for idx, template in enumerate(base[:count]):
         ts = now - timedelta(hours=idx + 2)
         docs.append(
@@ -99,7 +111,7 @@ def malware_samples(count: int, now: datetime) -> List[Dict[str, Any]]:
         )
     return docs
 
-
+# pylint: disable=import-error, wrong-import-position
 def pcap_samples(count: int, now: datetime) -> List[Dict[str, Any]]:
     base = [
         {
@@ -117,7 +129,7 @@ def pcap_samples(count: int, now: datetime) -> List[Dict[str, Any]]:
         docs.append({"timestamp": ts, "source": "seed/reporting", **template})
     return docs
 
-
+# pylint: disable=import-error, wrong-import-position
 def threat_samples(count: int, now: datetime) -> List[Dict[str, Any]]:
     base = [
         {
@@ -129,20 +141,23 @@ def threat_samples(count: int, now: datetime) -> List[Dict[str, Any]]:
             "threat_summary": {"overall_threat_level": "low", "syn_flood_alerts": 2},
         },
     ]
+
+    # Build documents
     docs: List[Dict[str, Any]] = []
     for idx, template in enumerate(base[:count]):
         ts = now - timedelta(hours=idx + 4)
         docs.append({"timestamp": ts, "source": "seed/reporting", **template})
     return docs
 
-
+# pylint: disable=import-error, wrong-import-position
 def cleanup(db, collections: List[str]) -> None:
     for name in collections:
         if name:
             deleted = db[name].delete_many({"source": "seed/reporting"}).deleted_count
             print(f"🧹 {name}: removed {deleted} seeded documents")
 
-
+# pylint: disable=import-error, wrong-import-position
+# pylint: disable=too-many-locals
 def main() -> None:
     parser = argparse.ArgumentParser(description="Seed Mongo for reporting dashboard demos")
     parser.add_argument("--config", default=os.getenv("PHISH_CFG", "config/base.yaml"), help="Path to YAML config")
@@ -156,6 +171,8 @@ def main() -> None:
     reset_db()
     cfg = load_config(args.config)
     db = get_db(cfg)
+
+    # Ensure MongoDB is configured
     if db is None:
         raise SystemExit("MongoDB not configured. Set MONGODB_URI or disable mongodb.enabled in config.")
 
@@ -166,6 +183,7 @@ def main() -> None:
         "pcap_threats": "threats",
     }
 
+    # If --cleanup, remove seeded docs and exit
     if args.cleanup:
         cleanup(db, list(collections.values()))
         return
@@ -178,11 +196,17 @@ def main() -> None:
 
     cleanup(db, list(collections.values()))
 
+
+# Insert documents
     inserted = {}
     if docs_phish:
         inserted["phishing"] = len(db[collections["phishing"]].insert_many(docs_phish).inserted_ids)
+
+        # Also create index on ts for phishing collection
     if docs_mal:
         inserted["malware"] = len(db[collections["malware"]].insert_many(docs_mal).inserted_ids)
+
+        # Also create index on ts for malware collection
     if docs_pcap:
         inserted["pcap_analyses"] = len(db[collections["pcap_analyses"]].insert_many(docs_pcap).inserted_ids)
     if docs_threat:

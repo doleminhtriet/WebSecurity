@@ -5,14 +5,18 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 TAG_RE = re.compile(r"<[^>]+>")
 URL_RE = re.compile(r"https?://[^\s)>\"]+", re.I)
 
+# Utility functions
 def _strip_html(x: str) -> str:
     return TAG_RE.sub(" ", x or "")
 
+#   Normalize input texts to a 1-D numpy array of strings
 def _normalize_texts(X) -> np.ndarray:
     """
     Return a 1-D numpy array of stringified texts for downstream processing.
     Accepts pandas objects, numpy arrays, sequences, and scalars.
     """
+
+    # Handle scalar inputs
     if isinstance(X, (str, bytes)):
         arr = np.array([X], dtype=object)
     else:
@@ -23,20 +27,29 @@ def _normalize_texts(X) -> np.ndarray:
             arr = arr.reshape(1)
     arr = arr.ravel()
     normalized = []
+
+    # Stringify each element
     for raw in arr:
+
+        # Preserve strings as-is
         if isinstance(raw, str):
             normalized.append(raw)
+
+        # Decode bytes to strings    
         elif raw is None:
             normalized.append("")
         else:
             normalized.append(str(raw))
     return np.asarray(normalized, dtype=object)
 
+# URL-derived feature extractor
 class UrlFeatures:
     def fit(self, X, y=None): return self
     def transform(self, X):
         arr = _normalize_texts(X)
         rows = []
+
+        # Extract URL-based features for each text
         for raw in arr:
             txt = raw
             urls = URL_RE.findall(txt) if txt else []
@@ -46,13 +59,18 @@ class UrlFeatures:
             has_login = 1.0 if re.search(r"(login|verify|update|reset)", txt, re.I) else 0.0
             has_ip = 1.0 if any(re.match(r"\d+\.\d+\.\d+\.\d+", h) for h in hosts) else 0.0
             rows.append([url_count, unique_domains, has_login, has_ip])
+        
+        # Convert to sparse matrix
         if rows:
             features = np.asarray(rows, dtype=np.float32)
+
+        # Handle empty input case    
         else:
             # Preserve expected column count even when the input is empty.
             features = np.zeros((int(arr.size), 4), dtype=np.float32)
         return csr_matrix(features)
 
+# Text featurizer with optional URL features
 class TextURLFeaturizer:
     """
     TfidfVectorizer wrapper that optionally augments text features with URL-derived features.
@@ -60,6 +78,7 @@ class TextURLFeaturizer:
     strip_html, include_url_features.
     """
 
+    # Initialization
     def __init__(
         self,
         vocab_size: int | None = None,
@@ -70,6 +89,7 @@ class TextURLFeaturizer:
         strip_html: bool = True,
         include_url_features: bool = True,
     ):
+           # Store parameters 
         self.vocab_size = vocab_size
         self.ngram_range = ngram_range
         self.min_df = min_df
@@ -80,6 +100,7 @@ class TextURLFeaturizer:
         self.vectorizer = self._create_vectorizer()
         self.expected_total_features = None
 
+    # Create the TfidfVectorizer with specified parameters
     def _create_vectorizer(self) -> TfidfVectorizer:
         max_features = self.vocab_size if (self.vocab_size and self.vocab_size > 0) else None
         return TfidfVectorizer(
@@ -91,11 +112,13 @@ class TextURLFeaturizer:
             dtype=np.float32,
         )
 
+    # Preprocess texts by stripping HTML if enabled
     def _preprocess(self, texts: np.ndarray) -> np.ndarray:
         if not self.strip_html:
             return texts
         return np.asarray([_strip_html(t) for t in texts], dtype=object)
 
+    # Fit, transform, and fit_transform methods
     def fit(self, X, y=None):
         texts = _normalize_texts(X)
         processed = self._preprocess(texts)
@@ -103,6 +126,7 @@ class TextURLFeaturizer:
         self.expected_total_features = len(self.vectorizer.vocabulary_) + (4 if self.include_url_features else 0)
         return self
 
+    # Transform method
     def transform(self, X):
         texts = _normalize_texts(X)
         processed = self._preprocess(texts)
@@ -113,31 +137,48 @@ class TextURLFeaturizer:
         else:
             X_combined = X_tfidf
         expected = getattr(self, "expected_total_features", None)
+
+        # Ensure consistent feature dimensions
         if expected is not None and X_combined.shape[1] != expected:
             diff = expected - X_combined.shape[1]
+
+            # Pad or truncate as necessary
             if diff > 0:
                 pad = csr_matrix((X_combined.shape[0], diff), dtype=X_combined.dtype)
                 X_combined = hstack([X_combined, pad], format="csr")
+
+            #   Truncate excess features    
             elif diff < 0:
                 X_combined = X_combined[:, :expected]
         return X_combined
 
+    # Fit_transform method
     def fit_transform(self, X, y=None):
         texts = _normalize_texts(X)
         processed = self._preprocess(texts)
         X_tfidf = self.vectorizer.fit_transform(processed, y)
+
+        # Combine with URL features if enabled
         if self.include_url_features:
             X_url = UrlFeatures().transform(texts)
             X_combined = hstack([X_tfidf, X_url], format="csr")
+
+        #   Otherwise, use only text features    
         else:
             X_combined = X_tfidf
         self.expected_total_features = X_combined.shape[1]
         expected = getattr(self, "expected_total_features", None)
+
+        # Ensure consistent feature dimensions
         if expected is not None and X_combined.shape[1] != expected:
             diff = expected - X_combined.shape[1]
+
+            #   Pad or truncate as necessary
             if diff > 0:
                 pad = csr_matrix((X_combined.shape[0], diff), dtype=X_combined.dtype)
                 X_combined = hstack([X_combined, pad], format="csr")
+
+            #   Truncate excess features
             elif diff < 0:
                 X_combined = X_combined[:, :expected]
         return X_combined
@@ -146,15 +187,21 @@ class TextURLFeaturizer:
     def __getstate__(self):
         return self.__dict__
 
+    # Restore state and ensure vectorizer and expected feature count are set
     def __setstate__(self, state):
         self.__dict__.update(state)
+
+        # Ensure vectorizer and expected feature count are initialized
         if "vectorizer" not in self.__dict__ or self.vectorizer is None:
             self.vectorizer = self._create_vectorizer()
+
+        # Ensure expected feature count is set    
         if "expected_total_features" not in self.__dict__ or self.expected_total_features is None:
             vocab = len(getattr(self.vectorizer, "vocabulary_", {}) or {})
             url_dims = 4 if self.include_url_features else 0
             self.expected_total_features = vocab + url_dims
 
+# Factory function to build featurizer based on config
 def build_featurizer(pcfg):
     fcfg = pcfg.get("features", {})
     ngram_range = tuple(fcfg.get("ngram_range", [1,2]))
@@ -164,6 +211,7 @@ def build_featurizer(pcfg):
     strip_html = bool(fcfg.get("strip_html", True))
     include_url = bool(fcfg.get("include_url_features", True))
 
+    # Define fit_transform and transform functions
     def fit_transform(texts):
         featurizer = TextURLFeaturizer(
             vocab_size=fcfg.get("vocab_size"),
@@ -177,6 +225,7 @@ def build_featurizer(pcfg):
         X = featurizer.fit_transform(texts)
         return (featurizer, featurizer.include_url_features), X
 
+    # Define transform function
     def transform(texts, fitted_tuple):
         featurizer, _ = fitted_tuple
         return featurizer.transform(texts)

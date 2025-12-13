@@ -39,6 +39,39 @@ uvicorn apps.api.main:app --reload
 ```
 Open the UI at `http://127.0.0.1:8000/app/index.html`.
 
+## Setup & Run (step-by-step)
+1) Clone and enter the repo  
+```bash
+git clone <repo-url> DepartmentOfDefense
+cd DepartmentOfDefense
+```
+2) Create/activate a virtualenv and install dependencies  
+```bash
+python3 -m venv .venv
+source .venv/bin/activate               # Windows: .venv\Scripts\activate
+pip install --upgrade pip
+pip install -r requirements.txt         # pulls FastAPI, sklearn, scapy, Mongo client
+```
+3) Configure environment variables  
+- Copy `.env.example` to `.env` and set `MONGODB_URI` if you want logging.  
+- Optional: adjust `PHISH_CFG` to point at a different YAML config (defaults to `config/base.yaml`).
+
+4) Run the FastAPI app  
+```bash
+uvicorn apps.api.main:app --reload
+```
+
+5) Use the UI and APIs  
+- Browser: `http://127.0.0.1:8000/app/index.html` (links to phishing/malware/pcap/reporting pages).  
+- Health check: `http://127.0.0.1:8000/health`.  
+- Example curl: `curl -X POST http://127.0.0.1:8000/phishing/predict -H 'Content-Type: application/json' -d '{"text":"sample email"}'`.
+
+6) (Optional) Retrain the phishing model  
+```bash
+python -m modules.scan_phishing.cli train --config config/base.yaml
+```
+Artifacts will be written to `modules/scan_phishing/artifacts/`; restart or call `POST /phishing/reload` to pick them up.
+
 ## Module Details
 
 ### Phishing Scanner
